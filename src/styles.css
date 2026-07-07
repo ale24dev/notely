@@ -199,6 +199,27 @@ body {
   box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.85);
 }
 
+.tag-chip.add-tag {
+  border-style: dashed;
+  gap: 3px;
+}
+
+.tag-chip.add-tag svg {
+  width: 10px;
+  height: 10px;
+}
+
+.new-tag-input {
+  border: 1px solid var(--accent);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  outline: none;
+  width: 110px;
+}
+
 /* Selector de color flotante */
 #color-picker {
   position: fixed;
@@ -233,6 +254,17 @@ body {
   box-shadow:
     0 0 0 2px var(--surface),
     0 0 0 3.5px var(--text-muted);
+}
+
+.picker-remove {
+  border: none;
+  border-left: 1px solid var(--border);
+  background: transparent;
+  color: var(--danger);
+  font-size: 11px;
+  padding: 0 2px 0 8px;
+  margin-left: 2px;
+  cursor: pointer;
 }
 
 .note-tags {
@@ -321,6 +353,54 @@ body {
   color: var(--text-muted);
   padding: 24px;
   line-height: 1.6;
+}
+
+/* ---- Etiquetas del editor ---- */
+.editor-tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 14px 6px;
+}
+
+.editor-tag-pills {
+  display: contents;
+}
+
+.editor-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.pill-remove {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  opacity: 0.65;
+}
+
+.pill-remove:hover {
+  opacity: 1;
+}
+
+#tag-input {
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 11px;
+  outline: none;
+  min-width: 90px;
+  padding: 2px 0;
+}
+
+#tag-input::placeholder {
+  color: var(--text-muted);
 }
 
 /* ---- Editor ---- */

@@ -41,6 +41,10 @@ export function setTagColor(tag: string, color: string): Promise<void> {
   return invoke("set_tag_color", { tag, color });
 }
 
+export function deleteTagColor(tag: string): Promise<void> {
+  return invoke("delete_tag_color", { tag });
+}
+
 export function quitApp(): Promise<void> {
   return invoke("quit");
 }

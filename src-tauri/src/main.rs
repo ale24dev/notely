@@ -35,7 +35,8 @@ fn main() {
             notes::delete_note,
             notes::toggle_pin,
             notes::get_tag_colors,
-            notes::set_tag_color
+            notes::set_tag_color,
+            notes::delete_tag_color
         ])
         .setup(|app| {
             // La app vive solo en el menu bar: sin icono en el Dock.

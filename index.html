@@ -36,7 +36,7 @@
             spellcheck="false"
           />
         </div>
-        <div id="tags-bar" class="tags-bar hidden"></div>
+        <div id="tags-bar" class="tags-bar"></div>
         <ul id="notes-list" class="notes-list"></ul>
         <p id="empty-state" class="empty-state hidden">
           No hay notas todavía.<br />Pulsa + para crear la primera.
@@ -71,6 +71,18 @@
             ></button>
           </div>
         </header>
+        <div class="editor-tags">
+          <div id="editor-tag-pills" class="editor-tag-pills"></div>
+          <input
+            id="tag-input"
+            type="text"
+            placeholder="+ etiqueta"
+            list="tags-datalist"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <datalist id="tags-datalist"></datalist>
+        </div>
         <textarea
           id="note-editor"
           placeholder="# Escribe tu nota en Markdown…"

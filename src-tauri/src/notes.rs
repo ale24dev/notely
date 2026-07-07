@@ -99,6 +99,19 @@ pub fn set_tag_color(app: AppHandle, tag: String, color: String) -> Result<(), S
     fs::write(tag_colors_path(&app)?, json).map_err(|e| e.to_string())
 }
 
+/// Elimina una etiqueta del registro de colores. Si ninguna nota la usa,
+/// desaparece de la barra de filtros.
+#[tauri::command]
+pub fn delete_tag_color(app: AppHandle, tag: String) -> Result<(), String> {
+    let tag = tag.trim().trim_start_matches('#').to_lowercase();
+    let mut colors = load_tag_colors(&app);
+    if colors.remove(&tag).is_some() {
+        let json = serde_json::to_string(&colors).map_err(|e| e.to_string())?;
+        fs::write(tag_colors_path(&app)?, json).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 // ---- Metadatos ----
 
 /// Extrae etiquetas `#tag` del contenido, ignorando bloques de código y

@@ -7,6 +7,7 @@ import "highlight.js/styles/github.css";
 import {
   createNote,
   deleteNote,
+  deleteTagColor,
   getTagColors,
   listNotes,
   loadNote,
@@ -37,6 +38,9 @@ const editor = document.querySelector<HTMLTextAreaElement>("#note-editor")!;
 const preview = document.querySelector<HTMLElement>("#note-preview")!;
 const saveStatus = document.querySelector<HTMLElement>("#save-status")!;
 const autostartToggle = document.querySelector<HTMLInputElement>("#autostart-toggle")!;
+const editorTagPills = document.querySelector<HTMLElement>("#editor-tag-pills")!;
+const tagInput = document.querySelector<HTMLInputElement>("#tag-input")!;
+const tagsDatalist = document.querySelector<HTMLDataListElement>("#tags-datalist")!;
 
 // Iconos estilo Cupertino (SVG estáticos propios, no contenido de usuario).
 newNoteBtn.innerHTML = icons.plus;
@@ -68,6 +72,42 @@ const PALETTE = [
   "#ff2d55", // rosa
   "#8e8e93", // gris
 ];
+
+/// Todas las etiquetas visibles: las usadas en notas más las creadas
+/// explícitamente (registradas en tagColors aunque aún no se usen).
+function allTags(): string[] {
+  return [...new Set([...notes.flatMap((n) => n.tags), ...Object.keys(tagColors)])].sort();
+}
+
+/// Normaliza el nombre de una etiqueta: sin '#', en minúsculas y solo
+/// letras, números, guiones y guiones bajos (igual que el backend).
+function normalizeTag(raw: string): string | null {
+  const tag = raw.trim().replace(/^#+/, "").replace(/\s+/g, "-").toLowerCase();
+  return /^[\p{L}\p{N}_-]+$/u.test(tag) ? tag : null;
+}
+
+/// Réplica en el cliente de extract_tags de Rust, para refrescar las
+/// etiquetas del editor mientras se escribe sin ir al backend.
+function extractTags(content: string): string[] {
+  const tags: string[] = [];
+  let inFence = false;
+  for (const line of content.split("\n")) {
+    const trimmed = line.trimStart();
+    if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    for (const token of line.split(/\s+/)) {
+      if (!token.startsWith("#") || token.startsWith("##")) continue;
+      const match = token.slice(1).match(/^[\p{L}\p{N}_-]+/u);
+      if (!match) continue;
+      const tag = match[0].toLowerCase();
+      if (!tags.includes(tag)) tags.push(tag);
+    }
+  }
+  return tags.sort();
+}
 
 /// Color de una etiqueta: el elegido por el usuario o, por defecto, uno
 /// estable derivado del nombre (hash djb2 sobre la paleta).
@@ -113,6 +153,22 @@ function openColorPicker(tag: string, anchor: HTMLElement) {
     });
     colorPicker.appendChild(swatch);
   }
+  // Una etiqueta creada pero sin usar en ninguna nota se puede quitar.
+  if (!notes.some((n) => n.tags.includes(tag))) {
+    const remove = document.createElement("button");
+    remove.className = "picker-remove";
+    remove.textContent = "Quitar";
+    remove.addEventListener("click", (e) => {
+      e.stopPropagation();
+      delete tagColors[tag];
+      if (activeTag === tag) activeTag = null;
+      closeColorPicker();
+      renderTags();
+      renderList();
+      void deleteTagColor(tag);
+    });
+    colorPicker.appendChild(remove);
+  }
   colorPicker.classList.remove("hidden");
   const rect = anchor.getBoundingClientRect();
   const left = Math.max(8, Math.min(rect.left, window.innerWidth - colorPicker.offsetWidth - 8));
@@ -136,7 +192,7 @@ async function refreshList() {
 }
 
 function renderTags() {
-  const tags = [...new Set(notes.flatMap((n) => n.tags))].sort();
+  const tags = allTags();
   if (activeTag !== null && !tags.includes(activeTag)) {
     activeTag = null;
   }
@@ -177,9 +233,59 @@ function renderTags() {
       e.stopPropagation();
       openColorPicker(tag, chip);
     });
+    chip.dataset.tag = tag;
     tagsBar.appendChild(chip);
   }
-  tagsBar.classList.toggle("hidden", tags.length === 0);
+
+  // Chip para crear una etiqueta nueva sin tener que escribir #tag a mano.
+  const addChip = document.createElement("button");
+  addChip.className = "tag-chip add-tag";
+  addChip.title = "Crear etiqueta";
+  addChip.innerHTML = `${icons.plus}<span>etiqueta</span>`;
+
+  const newTagInput = document.createElement("input");
+  newTagInput.className = "new-tag-input hidden";
+  newTagInput.placeholder = "nombre…";
+  newTagInput.spellcheck = false;
+
+  addChip.addEventListener("click", () => {
+    addChip.classList.add("hidden");
+    newTagInput.classList.remove("hidden");
+    newTagInput.focus();
+  });
+  newTagInput.addEventListener("keydown", (e) => {
+    e.stopPropagation();
+    if (e.key === "Enter") {
+      void createTag(newTagInput.value);
+    } else if (e.key === "Escape") {
+      renderTags();
+    }
+  });
+  newTagInput.addEventListener("blur", () => {
+    if (!newTagInput.classList.contains("hidden")) renderTags();
+  });
+
+  tagsBar.append(addChip, newTagInput);
+}
+
+/// Registra una etiqueta nueva (persistiendo su color por defecto) y abre
+/// el selector de color sobre su chip recién creado.
+async function createTag(raw: string) {
+  const tag = normalizeTag(raw);
+  if (tag === null) {
+    renderTags();
+    return;
+  }
+  const color = colorForTag(tag);
+  tagColors[tag] = color;
+  renderTags();
+  const chip = tagsBar.querySelector<HTMLElement>(`[data-tag="${CSS.escape(tag)}"]`);
+  if (chip) openColorPicker(tag, chip);
+  try {
+    await setTagColor(tag, color);
+  } catch {
+    // Si falla la persistencia, el color por defecto seguirá aplicándose.
+  }
 }
 
 function renderList() {
@@ -255,6 +361,98 @@ function formatDate(epochMs: number): string {
     : d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
 }
 
+// ---- Etiquetas de la nota abierta ----
+function renderEditorTags() {
+  const tags = extractTags(editor.value);
+  editorTagPills.innerHTML = "";
+  for (const tag of tags) {
+    const color = colorForTag(tag);
+    const pill = document.createElement("span");
+    pill.className = "note-tag editor-pill";
+    pill.style.background = `color-mix(in srgb, ${color} 18%, transparent)`;
+    pill.style.color = `color-mix(in srgb, ${color} 65%, var(--text))`;
+    pill.appendChild(document.createTextNode(`#${tag}`));
+
+    const remove = document.createElement("button");
+    remove.className = "pill-remove";
+    remove.textContent = "×";
+    remove.title = "Quitar etiqueta de la nota";
+    remove.addEventListener("click", () => removeTagFromNote(tag));
+    pill.appendChild(remove);
+
+    editorTagPills.appendChild(pill);
+  }
+
+  tagsDatalist.innerHTML = "";
+  for (const tag of allTags()) {
+    if (tags.includes(tag)) continue;
+    const option = document.createElement("option");
+    option.value = tag;
+    tagsDatalist.appendChild(option);
+  }
+}
+
+/// Añade `#tag` al final de la nota (reutilizando la última línea si ya
+/// es una línea de etiquetas).
+function addTagToNote(tag: string) {
+  if (extractTags(editor.value).includes(tag)) return;
+  if (editor.value.trim() === "") {
+    editor.value = `#${tag}`;
+  } else {
+    const lines = editor.value.replace(/\s+$/, "").split("\n");
+    const last = lines[lines.length - 1].trim();
+    const isTagLine = last.length > 0 && last.split(/\s+/).every((t) => t.startsWith("#") && !t.startsWith("##"));
+    if (isTagLine) {
+      lines[lines.length - 1] += ` #${tag}`;
+    } else {
+      lines.push("", `#${tag}`);
+    }
+    editor.value = lines.join("\n");
+  }
+  scheduleSave();
+  renderEditorTags();
+}
+
+/// Elimina todas las apariciones de `#tag` del texto (fuera de bloques de
+/// código), limpiando las líneas que queden vacías.
+function removeTagFromNote(tag: string) {
+  const lines = editor.value.split("\n");
+  let inFence = false;
+  const result: string[] = [];
+  for (const line of lines) {
+    const trimmed = line.trimStart();
+    if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
+      inFence = !inFence;
+      result.push(line);
+      continue;
+    }
+    if (inFence) {
+      result.push(line);
+      continue;
+    }
+    const hadTag = line.split(/\s+/).some((t) => isTagToken(t, tag));
+    if (!hadTag) {
+      result.push(line);
+      continue;
+    }
+    const cleaned = line
+      .split(/\s+/)
+      .filter((t) => !isTagToken(t, tag))
+      .join(" ")
+      .trimEnd();
+    if (cleaned.trim() !== "") result.push(cleaned);
+  }
+  editor.value = result.join("\n").replace(/\n+$/, "\n").replace(/^\n+/, "");
+  scheduleSave();
+  renderEditorTags();
+}
+
+function isTagToken(token: string, tag: string): boolean {
+  if (!token.startsWith("#") || token.startsWith("##")) return false;
+  const match = token.slice(1).match(/^[\p{L}\p{N}_-]+/u);
+  return match !== null && match[0].toLowerCase() === tag;
+}
+
 // ---- Editor ----
 async function openNote(id: string) {
   currentId = id;
@@ -263,6 +461,7 @@ async function openNote(id: string) {
   dirty = false;
   saveStatus.textContent = "";
   updatePinButton();
+  renderEditorTags();
   setPreviewMode(false);
   listView.classList.add("hidden");
   editorView.classList.remove("hidden");
@@ -412,8 +611,30 @@ backBtn.addEventListener("click", closeEditor);
 deleteBtn.addEventListener("click", removeCurrentNote);
 pinBtn.addEventListener("click", togglePinCurrent);
 previewBtn.addEventListener("click", () => setPreviewMode(!previewMode));
-editor.addEventListener("input", scheduleSave);
+editor.addEventListener("input", () => {
+  scheduleSave();
+  renderEditorTags();
+});
 searchInput.addEventListener("input", renderList);
+
+// Añadir etiqueta a la nota abierta desde el campo del editor.
+tagInput.addEventListener("keydown", (e) => {
+  e.stopPropagation();
+  if (e.key === "Enter") {
+    const tag = normalizeTag(tagInput.value);
+    if (tag !== null) addTagToNote(tag);
+    tagInput.value = "";
+  } else if (e.key === "Escape") {
+    tagInput.value = "";
+    tagInput.blur();
+  }
+});
+// El autocompletado del datalist dispara "change" al elegir una opción.
+tagInput.addEventListener("change", () => {
+  const tag = normalizeTag(tagInput.value);
+  if (tag !== null) addTagToNote(tag);
+  tagInput.value = "";
+});
 
 document.addEventListener("keydown", (e) => {
   const cmd = e.metaKey || e.ctrlKey;
