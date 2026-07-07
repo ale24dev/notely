@@ -7,10 +7,12 @@ import "highlight.js/styles/github.css";
 import {
   createNote,
   deleteNote,
+  getTagColors,
   listNotes,
   loadNote,
   quitApp,
   saveNote,
+  setTagColor,
   togglePin,
   type NoteMeta,
 } from "./api";
@@ -49,8 +51,82 @@ let currentId: string | null = null;
 let currentPinned = false;
 let previewMode = false;
 let activeTag: string | null = null;
+let tagColors: Record<string, string> = {};
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let dirty = false;
+
+// ---- Colores de etiquetas ----
+// Paleta de colores de sistema de Apple (Human Interface Guidelines).
+const PALETTE = [
+  "#ff3b30", // rojo
+  "#ff9500", // naranja
+  "#ffcc00", // amarillo
+  "#34c759", // verde
+  "#00c7be", // menta
+  "#007aff", // azul
+  "#af52de", // morado
+  "#ff2d55", // rosa
+  "#8e8e93", // gris
+];
+
+/// Color de una etiqueta: el elegido por el usuario o, por defecto, uno
+/// estable derivado del nombre (hash djb2 sobre la paleta).
+function colorForTag(tag: string): string {
+  const custom = tagColors[tag];
+  if (custom) return custom;
+  let hash = 5381;
+  for (let i = 0; i < tag.length; i++) {
+    hash = ((hash << 5) + hash + tag.charCodeAt(i)) >>> 0;
+  }
+  return PALETTE[hash % PALETTE.length];
+}
+
+/// Color de texto legible sobre un fondo hex dado.
+function textOn(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return 0.299 * r + 0.587 * g + 0.114 * b > 160 ? "#1d1d1f" : "#ffffff";
+}
+
+// Selector de color flotante, compartido por todos los chips.
+const colorPicker = document.createElement("div");
+colorPicker.id = "color-picker";
+colorPicker.classList.add("hidden");
+document.body.appendChild(colorPicker);
+
+function openColorPicker(tag: string, anchor: HTMLElement) {
+  colorPicker.innerHTML = "";
+  const current = colorForTag(tag);
+  for (const color of PALETTE) {
+    const swatch = document.createElement("button");
+    swatch.className = "swatch" + (color === current ? " selected" : "");
+    swatch.style.background = color;
+    swatch.title = color;
+    swatch.addEventListener("click", (e) => {
+      e.stopPropagation();
+      tagColors[tag] = color;
+      closeColorPicker();
+      renderTags();
+      renderList();
+      void setTagColor(tag, color);
+    });
+    colorPicker.appendChild(swatch);
+  }
+  colorPicker.classList.remove("hidden");
+  const rect = anchor.getBoundingClientRect();
+  const left = Math.max(8, Math.min(rect.left, window.innerWidth - colorPicker.offsetWidth - 8));
+  colorPicker.style.left = `${left}px`;
+  colorPicker.style.top = `${rect.bottom + 6}px`;
+}
+
+function closeColorPicker() {
+  colorPicker.classList.add("hidden");
+}
+
+document.addEventListener("click", (e) => {
+  if (!colorPicker.contains(e.target as Node)) closeColorPicker();
+});
 
 // ---- Lista de notas ----
 async function refreshList() {
@@ -66,14 +142,40 @@ function renderTags() {
   }
   tagsBar.innerHTML = "";
   for (const tag of tags) {
+    const color = colorForTag(tag);
     const chip = document.createElement("button");
     chip.className = "tag-chip";
-    chip.textContent = `#${tag}`;
-    chip.classList.toggle("active", tag === activeTag);
+    chip.title = "Filtrar por etiqueta · clic en el punto para cambiar el color";
+
+    const dot = document.createElement("span");
+    dot.className = "tag-dot";
+    dot.style.background = color;
+    dot.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openColorPicker(tag, chip);
+    });
+
+    const label = document.createElement("span");
+    label.textContent = `#${tag}`;
+
+    chip.append(dot, label);
+
+    if (tag === activeTag) {
+      chip.classList.add("active");
+      chip.style.background = color;
+      chip.style.borderColor = color;
+      chip.style.color = textOn(color);
+    }
+
     chip.addEventListener("click", () => {
       activeTag = tag === activeTag ? null : tag;
       renderTags();
       renderList();
+    });
+    chip.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openColorPicker(tag, chip);
     });
     tagsBar.appendChild(chip);
   }
@@ -124,7 +226,15 @@ function renderList() {
     if (note.tags.length > 0) {
       const tagRow = document.createElement("span");
       tagRow.className = "note-tags";
-      tagRow.textContent = note.tags.map((t) => `#${t}`).join(" ");
+      for (const tag of note.tags) {
+        const color = colorForTag(tag);
+        const pill = document.createElement("span");
+        pill.className = "note-tag";
+        pill.textContent = `#${tag}`;
+        pill.style.background = `color-mix(in srgb, ${color} 18%, transparent)`;
+        pill.style.color = `color-mix(in srgb, ${color} 65%, var(--text))`;
+        tagRow.appendChild(pill);
+      }
       li.appendChild(tagRow);
     }
 
@@ -318,7 +428,9 @@ document.addEventListener("keydown", (e) => {
     setPreviewMode(!previewMode);
   } else if (e.key === "Escape") {
     e.preventDefault();
-    if (currentId !== null) {
+    if (!colorPicker.classList.contains("hidden")) {
+      closeColorPicker();
+    } else if (currentId !== null) {
       void closeEditor();
     } else {
       void getCurrentWindow().hide();
@@ -343,5 +455,14 @@ editor.addEventListener("keydown", (e) => {
   }
 });
 
-void refreshList();
+async function init() {
+  try {
+    tagColors = await getTagColors();
+  } catch {
+    // Sin colores personalizados; se usan los de la paleta por defecto.
+  }
+  await refreshList();
+}
+
+void init();
 void initAutostart();

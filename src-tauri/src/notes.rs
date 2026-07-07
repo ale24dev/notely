@@ -1,5 +1,5 @@
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     fs,
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
@@ -60,6 +60,43 @@ fn load_pins(app: &AppHandle) -> HashSet<String> {
 fn save_pins(app: &AppHandle, pins: &HashSet<String>) -> Result<(), String> {
     let json = serde_json::to_string(pins).map_err(|e| e.to_string())?;
     fs::write(pins_path(app)?, json).map_err(|e| e.to_string())
+}
+
+// ---- Colores de etiquetas ----
+
+fn tag_colors_path(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(data_dir(app)?.join("tag_colors.json"))
+}
+
+fn load_tag_colors(app: &AppHandle) -> HashMap<String, String> {
+    tag_colors_path(app)
+        .ok()
+        .and_then(|p| fs::read_to_string(p).ok())
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
+/// Colores elegidos por el usuario, como mapa `tag -> "#rrggbb"`. Las
+/// etiquetas sin entrada usan un color por defecto calculado en el frontend.
+#[tauri::command]
+pub fn get_tag_colors(app: AppHandle) -> Result<HashMap<String, String>, String> {
+    Ok(load_tag_colors(&app))
+}
+
+#[tauri::command]
+pub fn set_tag_color(app: AppHandle, tag: String, color: String) -> Result<(), String> {
+    let tag = tag.trim().trim_start_matches('#').to_lowercase();
+    if tag.is_empty() {
+        return Err("etiqueta vacía".into());
+    }
+    let hex = color.strip_prefix('#').unwrap_or("");
+    if hex.len() != 6 || !hex.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err("color no válido: se espera #rrggbb".into());
+    }
+    let mut colors = load_tag_colors(&app);
+    colors.insert(tag, color.to_lowercase());
+    let json = serde_json::to_string(&colors).map_err(|e| e.to_string())?;
+    fs::write(tag_colors_path(&app)?, json).map_err(|e| e.to_string())
 }
 
 // ---- Metadatos ----

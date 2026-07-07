@@ -33,6 +33,14 @@ export function togglePin(id: string): Promise<boolean> {
   return invoke("toggle_pin", { id });
 }
 
+export function getTagColors(): Promise<Record<string, string>> {
+  return invoke("get_tag_colors");
+}
+
+export function setTagColor(tag: string, color: string): Promise<void> {
+  return invoke("set_tag_color", { tag, color });
+}
+
 export function quitApp(): Promise<void> {
   return invoke("quit");
 }

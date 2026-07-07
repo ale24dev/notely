@@ -8,7 +8,7 @@ Gestor de notas en **Markdown** que vive en el **menu bar de macOS**, construido
 - ✍️ **Markdown**: escribe con resaltado monoespaciado y alterna a vista previa renderizada (GFM: tablas, listas de tareas, etc.).
 - ☑️ **Checklists interactivas**: marca y desmarca las casillas `- [ ]` directamente en la vista previa; el cambio se escribe de vuelta en el Markdown.
 - 🎨 **Resaltado de sintaxis** en los bloques de código de la vista previa (highlight.js, temas claro y oscuro).
-- 🏷️ **Etiquetas**: escribe `#tag` en cualquier nota y aparecerá como filtro clicable sobre la lista; la búsqueda también encuentra tags.
+- 🏷️ **Etiquetas con colores**: escribe `#tag` en cualquier nota y aparecerá como filtro clicable sobre la lista; la búsqueda también encuentra tags. Cada etiqueta recibe un color de la paleta de sistema de Apple (estable, derivado del nombre) y puedes cambiarlo pulsando el punto de color del chip (o con clic derecho). Los colores se guardan en `tag_colors.json`.
 - 📌 **Notas fijadas**: ancla las importantes para que queden siempre arriba de la lista.
 - 🚀 **Abrir al iniciar sesión**: actívalo desde el pie de la lista de notas.
 - 💾 **Guardado automático**: las notas se guardan mientras escribes como archivos `.md` en `~/Library/Application Support/com.notely.app/notes/` — tuyas para siempre, sin formatos propietarios.

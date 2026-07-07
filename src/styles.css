@@ -167,6 +167,9 @@ body {
 }
 
 .tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text-muted);
@@ -177,25 +180,73 @@ body {
 }
 
 .tag-chip.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-text);
   font-weight: 600;
 }
 
-.note-tags {
-  font-size: 11px;
-  color: var(--accent-text);
-  opacity: 0.8;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.tag-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  cursor: pointer;
 }
 
-@media (prefers-color-scheme: dark) {
-  .note-tags {
-    color: var(--accent);
-  }
+.tag-dot:hover {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--text) 25%, transparent);
+}
+
+.tag-chip.active .tag-dot {
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.85);
+}
+
+/* Selector de color flotante */
+#color-picker {
+  position: fixed;
+  z-index: 50;
+  display: flex;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+#color-picker.hidden {
+  display: none;
+}
+
+.swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.swatch:hover {
+  transform: scale(1.2);
+}
+
+.swatch.selected {
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 3.5px var(--text-muted);
+}
+
+.note-tags {
+  display: flex;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.note-tag {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 999px;
+  white-space: nowrap;
 }
 
 .pin-badge {
