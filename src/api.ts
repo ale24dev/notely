@@ -26,3 +26,7 @@ export function createNote(): Promise<NoteMeta> {
 export function deleteNote(id: string): Promise<void> {
   return invoke("delete_note", { id });
 }
+
+export function quitApp(): Promise<void> {
+  return invoke("quit");
+}

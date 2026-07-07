@@ -17,8 +17,9 @@ Gestor de notas en **Markdown** que vive en el **menu bar de macOS**, construido
 | `⌘N` | Nueva nota |
 | `⌘E` | Alternar editor / vista previa |
 | `Esc` | Volver a la lista · cerrar el popover |
+| `⌘Q` | Salir de la app |
 
-El popover también se cierra automáticamente al hacer clic fuera de él. Para salir de la app: clic derecho en el icono del menu bar → **Salir de Notely**.
+Cualquier clic en el icono del menu bar abre/cierra el popover, que también se cierra automáticamente al hacer clic fuera de él. Para salir de la app usa el botón ⏻ de la lista de notas (o `⌘Q` con el popover abierto). El tray no lleva menú nativo a propósito: en macOS un menú adjunto puede quedarse con los clics y impedir que el popover se abra.
 
 ## Desarrollo
 

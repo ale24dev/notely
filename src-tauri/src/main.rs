@@ -9,9 +9,8 @@ use std::{
 };
 
 use tauri::{
-    menu::{Menu, MenuItem},
-    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    Manager,
+    tray::{MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    AppHandle, Manager,
 };
 use tauri_plugin_positioner::{Position, WindowExt};
 
@@ -24,6 +23,7 @@ fn main() {
         .plugin(tauri_plugin_positioner::init())
         .manage(LastHide(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
+            quit,
             notes::list_notes,
             notes::load_note,
             notes::save_note,
@@ -35,27 +35,20 @@ fn main() {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
-            let quit = MenuItem::with_id(app, "quit", "Salir de Notely", true, Some("Cmd+Q"))?;
-            let menu = Menu::with_items(app, &[&quit])?;
-
             let tray_icon = tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png"))?;
 
+            // Sin menú nativo: si el tray tiene un menú adjunto, macOS puede
+            // quedarse los clics para mostrarlo y la ventana nunca se abre.
+            // Cualquier clic (izquierdo o derecho) alterna el popover; salir
+            // de la app se hace desde la propia UI (botón ⏻ o ⌘Q).
             TrayIconBuilder::with_id("main-tray")
                 .icon(tray_icon)
                 .icon_as_template(true)
                 .tooltip("Notely")
-                .menu(&menu)
-                .show_menu_on_left_click(false)
-                .on_menu_event(|app, event| {
-                    if event.id.as_ref() == "quit" {
-                        app.exit(0);
-                    }
-                })
                 .on_tray_icon_event(|tray, event| {
                     tauri_plugin_positioner::on_tray_event(tray.app_handle(), &event);
                     if let TrayIconEvent::Click {
-                        button: MouseButton::Left,
-                        button_state: MouseButtonState::Up,
+                        button_state: MouseButtonState::Down,
                         ..
                     } = event
                     {
@@ -79,7 +72,12 @@ fn main() {
         .expect("error al iniciar Notely");
 }
 
-fn toggle_window(app: &tauri::AppHandle) {
+#[tauri::command]
+fn quit(app: AppHandle) {
+    app.exit(0);
+}
+
+fn toggle_window(app: &AppHandle) {
     let Some(window) = app.get_webview_window("main") else {
         return;
     };

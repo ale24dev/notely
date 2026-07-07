@@ -1,7 +1,15 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
-import { createNote, deleteNote, listNotes, loadNote, saveNote, type NoteMeta } from "./api";
+import {
+  createNote,
+  deleteNote,
+  listNotes,
+  loadNote,
+  quitApp,
+  saveNote,
+  type NoteMeta,
+} from "./api";
 
 marked.setOptions({ gfm: true, breaks: true });
 
@@ -12,6 +20,7 @@ const notesList = document.querySelector<HTMLUListElement>("#notes-list")!;
 const emptyState = document.querySelector<HTMLElement>("#empty-state")!;
 const searchInput = document.querySelector<HTMLInputElement>("#search-input")!;
 const newNoteBtn = document.querySelector<HTMLButtonElement>("#new-note-btn")!;
+const quitBtn = document.querySelector<HTMLButtonElement>("#quit-btn")!;
 const backBtn = document.querySelector<HTMLButtonElement>("#back-btn")!;
 const deleteBtn = document.querySelector<HTMLButtonElement>("#delete-note-btn")!;
 const previewBtn = document.querySelector<HTMLButtonElement>("#toggle-preview-btn")!;
@@ -145,6 +154,10 @@ async function removeCurrentNote() {
 
 // ---- Eventos ----
 newNoteBtn.addEventListener("click", newNote);
+quitBtn.addEventListener("click", async () => {
+  await flushSave();
+  await quitApp();
+});
 backBtn.addEventListener("click", closeEditor);
 deleteBtn.addEventListener("click", removeCurrentNote);
 previewBtn.addEventListener("click", () => setPreviewMode(!previewMode));
@@ -153,7 +166,10 @@ searchInput.addEventListener("input", renderList);
 
 document.addEventListener("keydown", (e) => {
   const cmd = e.metaKey || e.ctrlKey;
-  if (cmd && e.key === "n") {
+  if (cmd && e.key === "q") {
+    e.preventDefault();
+    void flushSave().then(quitApp);
+  } else if (cmd && e.key === "n") {
     e.preventDefault();
     void newNote();
   } else if (cmd && e.key === "e" && currentId !== null) {
