@@ -43,6 +43,13 @@ fn main() {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
+            // El popover debe poder mostrarse sobre apps a pantalla completa
+            // y en cualquier Space, como los popovers nativos del menu bar.
+            #[cfg(target_os = "macos")]
+            if let Some(window) = app.get_webview_window("main") {
+                configure_macos_panel(&window);
+            }
+
             let tray_icon = tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png"))?;
 
             // Sin menú nativo: si el tray tiene un menú adjunto, macOS puede
@@ -83,6 +90,30 @@ fn main() {
 #[tauri::command]
 fn quit(app: AppHandle) {
     app.exit(0);
+}
+
+/// Configura la NSWindow como panel auxiliar del menu bar: puede unirse a
+/// cualquier Space (incluidos los de pantalla completa, gracias a
+/// FullScreenAuxiliary) y flota al nivel de la barra de estado. Sin esto,
+/// macOS no muestra la ventana cuando la app activa está a pantalla
+/// completa.
+#[cfg(target_os = "macos")]
+fn configure_macos_panel(window: &tauri::WebviewWindow) {
+    use objc2_app_kit::{NSWindow, NSWindowCollectionBehavior};
+
+    let Ok(ns_ptr) = window.ns_window() else {
+        return;
+    };
+    // Puntero válido durante toda la vida de la ventana; solo se usa aquí,
+    // en el hilo principal (setup), como exige AppKit.
+    let ns_window = unsafe { &*(ns_ptr as *const NSWindow) };
+    ns_window.setCollectionBehavior(
+        NSWindowCollectionBehavior::CanJoinAllSpaces
+            | NSWindowCollectionBehavior::FullScreenAuxiliary,
+    );
+    // NSStatusWindowLevel: por encima de las ventanas normales y de las
+    // barras de las apps a pantalla completa.
+    ns_window.setLevel(25);
 }
 
 fn toggle_window(app: &AppHandle) {
