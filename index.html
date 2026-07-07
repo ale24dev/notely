@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Notely</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- Vista: lista de notas -->
+      <section id="list-view" class="view">
+        <header class="toolbar">
+          <span class="app-title">Notely</span>
+          <button id="new-note-btn" class="icon-btn" title="Nueva nota (⌘N)">＋</button>
+        </header>
+        <div class="search-wrap">
+          <input
+            id="search-input"
+            type="search"
+            placeholder="Buscar notas…"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </div>
+        <ul id="notes-list" class="notes-list"></ul>
+        <p id="empty-state" class="empty-state hidden">
+          No hay notas todavía.<br />Pulsa ＋ para crear la primera.
+        </p>
+      </section>
+
+      <!-- Vista: editor de una nota -->
+      <section id="editor-view" class="view hidden">
+        <header class="toolbar">
+          <button id="back-btn" class="icon-btn" title="Volver">‹</button>
+          <div class="toolbar-actions">
+            <button id="toggle-preview-btn" class="pill-btn" title="Alternar vista previa (⌘E)">
+              Vista previa
+            </button>
+            <button id="delete-note-btn" class="icon-btn danger" title="Eliminar nota">🗑</button>
+          </div>
+        </header>
+        <textarea
+          id="note-editor"
+          placeholder="# Escribe tu nota en Markdown…"
+          spellcheck="false"
+        ></textarea>
+        <article id="note-preview" class="markdown-body hidden"></article>
+        <footer class="statusbar">
+          <span id="save-status"></span>
+        </footer>
+      </section>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

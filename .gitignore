@@ -1,0 +1,11 @@
+# Dependencias y builds
+node_modules
+dist
+
+# Tauri
+src-tauri/target
+src-tauri/gen/schemas
+
+# Editor / SO
+.DS_Store
+*.local

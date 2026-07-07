@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd166"/>
+      <stop offset="1" stop-color="#f5a623"/>
+    </linearGradient>
+  </defs>
+  <!-- Fondo redondeado estilo macOS -->
+  <rect x="96" y="96" width="832" height="832" rx="188" fill="url(#bg)"/>
+  <!-- Hoja de nota con esquina doblada -->
+  <path d="M296 240h336l136 136v408a40 40 0 0 1-40 40H296a40 40 0 0 1-40-40V280a40 40 0 0 1 40-40z" fill="#fffdf5"/>
+  <path d="M632 240l136 136H672a40 40 0 0 1-40-40z" fill="#e8d9ae"/>
+  <!-- Líneas de texto -->
+  <path d="M336 480h352M336 568h352M336 656h240" stroke="#c9a227" stroke-width="36" stroke-linecap="round" fill="none"/>
+</svg>

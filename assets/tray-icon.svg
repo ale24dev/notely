@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Icono plantilla para el menu bar: solo negro + alfa.
+       macOS lo tiñe automáticamente según el tema (icon_as_template). -->
+  <path d="M232 128h384l176 176v528a64 64 0 0 1-64 64H232a64 64 0 0 1-64-64V192a64 64 0 0 1 64-64zm368 64H232v640h496V320H600zm64 34v62h62z" fill="#000"/>
+  <path d="M296 480h432v56H296zm0 132h432v56H296zm0 132h288v56H296z" fill="#000"/>
+</svg>
