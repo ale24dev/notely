@@ -13,8 +13,18 @@
         <header class="toolbar">
           <span class="app-title">Notely</span>
           <div class="toolbar-actions">
-            <button id="quit-btn" class="icon-btn quit" title="Salir de Notely (⌘Q)">⏻</button>
-            <button id="new-note-btn" class="icon-btn" title="Nueva nota (⌘N)">＋</button>
+            <button
+              id="quit-btn"
+              class="icon-btn quit"
+              title="Salir de Notely (⌘Q)"
+              aria-label="Salir de Notely"
+            ></button>
+            <button
+              id="new-note-btn"
+              class="icon-btn"
+              title="Nueva nota (⌘N)"
+              aria-label="Nueva nota"
+            ></button>
           </div>
         </header>
         <div class="search-wrap">
@@ -29,7 +39,7 @@
         <div id="tags-bar" class="tags-bar hidden"></div>
         <ul id="notes-list" class="notes-list"></ul>
         <p id="empty-state" class="empty-state hidden">
-          No hay notas todavía.<br />Pulsa ＋ para crear la primera.
+          No hay notas todavía.<br />Pulsa + para crear la primera.
         </p>
         <footer class="list-footer">
           <label class="autostart-label" title="Lanzar Notely automáticamente al iniciar sesión">
@@ -42,13 +52,23 @@
       <!-- Vista: editor de una nota -->
       <section id="editor-view" class="view hidden">
         <header class="toolbar">
-          <button id="back-btn" class="icon-btn" title="Volver">‹</button>
+          <button id="back-btn" class="icon-btn" title="Volver" aria-label="Volver"></button>
           <div class="toolbar-actions">
             <button id="toggle-preview-btn" class="pill-btn" title="Alternar vista previa (⌘E)">
               Vista previa
             </button>
-            <button id="pin-note-btn" class="icon-btn" title="Fijar nota arriba">📌</button>
-            <button id="delete-note-btn" class="icon-btn danger" title="Eliminar nota">🗑</button>
+            <button
+              id="pin-note-btn"
+              class="icon-btn"
+              title="Fijar nota arriba"
+              aria-label="Fijar nota"
+            ></button>
+            <button
+              id="delete-note-btn"
+              class="icon-btn danger"
+              title="Eliminar nota"
+              aria-label="Eliminar nota"
+            ></button>
           </div>
         </header>
         <textarea

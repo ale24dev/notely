@@ -14,6 +14,7 @@ import {
   togglePin,
   type NoteMeta,
 } from "./api";
+import { icons } from "./icons";
 
 marked.setOptions({ gfm: true, breaks: true });
 
@@ -34,6 +35,13 @@ const editor = document.querySelector<HTMLTextAreaElement>("#note-editor")!;
 const preview = document.querySelector<HTMLElement>("#note-preview")!;
 const saveStatus = document.querySelector<HTMLElement>("#save-status")!;
 const autostartToggle = document.querySelector<HTMLInputElement>("#autostart-toggle")!;
+
+// Iconos estilo Cupertino (SVG estáticos propios, no contenido de usuario).
+newNoteBtn.innerHTML = icons.plus;
+quitBtn.innerHTML = icons.power;
+backBtn.innerHTML = icons.chevronLeft;
+deleteBtn.innerHTML = icons.trash;
+pinBtn.innerHTML = icons.pin;
 
 // ---- Estado ----
 let notes: NoteMeta[] = [];
@@ -94,10 +102,13 @@ function renderList() {
     if (note.pinned) {
       const pin = document.createElement("span");
       pin.className = "pin-badge";
-      pin.textContent = "📌";
+      pin.innerHTML = icons.pin;
       titleRow.appendChild(pin);
     }
-    titleRow.appendChild(document.createTextNode(note.title || "Sin título"));
+    const titleText = document.createElement("span");
+    titleText.className = "note-title-text";
+    titleText.textContent = note.title || "Sin título";
+    titleRow.appendChild(titleText);
 
     const meta = document.createElement("span");
     meta.className = "note-meta";

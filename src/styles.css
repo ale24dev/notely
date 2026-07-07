@@ -94,13 +94,26 @@ body {
   background: var(--border);
 }
 
+.icon-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
 .icon-btn.quit {
-  font-size: 14px;
   color: var(--text-muted);
+}
+
+.icon-btn.quit svg {
+  width: 14px;
+  height: 14px;
 }
 
 .icon-btn.pinned {
   background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.icon-btn.pinned .pin-body {
+  fill: currentColor;
 }
 
 .icon-btn.danger:hover {
@@ -186,8 +199,17 @@ body {
 }
 
 .pin-badge {
-  font-size: 11px;
-  margin-right: 4px;
+  display: inline-flex;
+  color: var(--text-muted);
+}
+
+.pin-badge svg {
+  width: 11px;
+  height: 11px;
+}
+
+.pin-badge .pin-body {
+  fill: currentColor;
 }
 
 /* ---- Lista de notas ---- */
@@ -213,6 +235,13 @@ body {
 
 .note-item .note-title {
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.note-item .note-title-text {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
