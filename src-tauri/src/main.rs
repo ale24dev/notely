@@ -21,6 +21,10 @@ struct LastHide(Mutex<Option<Instant>>);
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_positioner::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         .manage(LastHide(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
             quit,
@@ -28,7 +32,8 @@ fn main() {
             notes::load_note,
             notes::save_note,
             notes::create_note,
-            notes::delete_note
+            notes::delete_note,
+            notes::toggle_pin
         ])
         .setup(|app| {
             // La app vive solo en el menu bar: sin icono en el Dock.

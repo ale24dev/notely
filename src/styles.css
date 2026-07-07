@@ -99,6 +99,10 @@ body {
   color: var(--text-muted);
 }
 
+.icon-btn.pinned {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
 .icon-btn.danger:hover {
   background: color-mix(in srgb, var(--danger) 15%, transparent);
   color: var(--danger);
@@ -139,6 +143,51 @@ body {
 
 #search-input:focus {
   border-color: var(--accent);
+}
+
+/* ---- Etiquetas ---- */
+.tags-bar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 0 12px 8px;
+}
+
+.tag-chip {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.tag-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.note-tags {
+  font-size: 11px;
+  color: var(--accent-text);
+  opacity: 0.8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (prefers-color-scheme: dark) {
+  .note-tags {
+    color: var(--accent);
+  }
+}
+
+.pin-badge {
+  font-size: 11px;
+  margin-right: 4px;
 }
 
 /* ---- Lista de notas ---- */
@@ -312,4 +361,101 @@ body {
   font-size: 11px;
   color: var(--text-muted);
   min-height: 24px;
+}
+
+/* ---- Pie de la lista (autostart) ---- */
+.list-footer {
+  border-top: 1px solid var(--border);
+  padding: 8px 12px 10px;
+  margin-top: auto;
+}
+
+.autostart-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+/* ---- Resaltado de código (highlight.js) ----
+   El tema importado (github.css) es claro; aquí se neutraliza su fondo y
+   se redefinen los colores de los tokens para el modo oscuro. */
+.markdown-body pre code.hljs {
+  background: transparent;
+  padding: 0;
+}
+
+@media (prefers-color-scheme: dark) {
+  .hljs {
+    color: #c9d1d9;
+  }
+  .hljs-comment,
+  .hljs-code,
+  .hljs-formula {
+    color: #8b949e;
+  }
+  .hljs-keyword,
+  .hljs-doctag,
+  .hljs-template-tag,
+  .hljs-template-variable,
+  .hljs-type,
+  .hljs-variable.language_ {
+    color: #ff7b72;
+  }
+  .hljs-title,
+  .hljs-title.class_,
+  .hljs-title.class_.inherited__,
+  .hljs-title.function_ {
+    color: #d2a8ff;
+  }
+  .hljs-attr,
+  .hljs-attribute,
+  .hljs-literal,
+  .hljs-meta,
+  .hljs-number,
+  .hljs-operator,
+  .hljs-selector-attr,
+  .hljs-selector-class,
+  .hljs-selector-id,
+  .hljs-variable {
+    color: #79c0ff;
+  }
+  .hljs-string,
+  .hljs-meta .hljs-string,
+  .hljs-regexp {
+    color: #a5d6ff;
+  }
+  .hljs-built_in,
+  .hljs-symbol {
+    color: #ffa657;
+  }
+  .hljs-name,
+  .hljs-quote,
+  .hljs-selector-tag,
+  .hljs-selector-pseudo {
+    color: #7ee787;
+  }
+  .hljs-emphasis {
+    font-style: italic;
+  }
+  .hljs-strong {
+    font-weight: bold;
+  }
+  .hljs-section {
+    color: #1f6feb;
+    font-weight: bold;
+  }
+  .hljs-bullet {
+    color: #f2cc60;
+  }
+  .hljs-addition {
+    color: #aff5b4;
+    background-color: #033a16;
+  }
+  .hljs-deletion {
+    color: #ffdcd7;
+    background-color: #67060c;
+  }
 }

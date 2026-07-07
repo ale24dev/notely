@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     fs,
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
@@ -14,16 +15,21 @@ pub struct NoteMeta {
     pub preview: String,
     /// Última modificación en milisegundos desde epoch.
     pub updated_at: u64,
+    pub pinned: bool,
+    /// Etiquetas `#tag` extraídas del contenido, en minúsculas.
+    pub tags: Vec<String>,
+}
+
+fn data_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
 }
 
 /// Directorio donde se guardan las notas como archivos `.md`:
 /// `~/Library/Application Support/com.notely.app/notes` en macOS.
 fn notes_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    let dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("notes");
+    let dir = data_dir(app)?.join("notes");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir)
 }
@@ -37,7 +43,60 @@ fn note_path(app: &AppHandle, id: &str) -> Result<PathBuf, String> {
     Ok(notes_dir(app)?.join(format!("{id}.md")))
 }
 
-fn meta_from_content(id: &str, content: &str, updated_at: u64) -> NoteMeta {
+// ---- Notas fijadas ----
+
+fn pins_path(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(data_dir(app)?.join("pins.json"))
+}
+
+fn load_pins(app: &AppHandle) -> HashSet<String> {
+    pins_path(app)
+        .ok()
+        .and_then(|p| fs::read_to_string(p).ok())
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
+fn save_pins(app: &AppHandle, pins: &HashSet<String>) -> Result<(), String> {
+    let json = serde_json::to_string(pins).map_err(|e| e.to_string())?;
+    fs::write(pins_path(app)?, json).map_err(|e| e.to_string())
+}
+
+// ---- Metadatos ----
+
+/// Extrae etiquetas `#tag` del contenido, ignorando bloques de código y
+/// encabezados Markdown (`# Título` produce un token `#` sin nombre).
+fn extract_tags(content: &str) -> Vec<String> {
+    let mut tags: Vec<String> = Vec::new();
+    let mut in_fence = false;
+    for line in content.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+            in_fence = !in_fence;
+            continue;
+        }
+        if in_fence {
+            continue;
+        }
+        for token in line.split_whitespace() {
+            let Some(rest) = token.strip_prefix('#') else {
+                continue;
+            };
+            let tag: String = rest
+                .chars()
+                .take_while(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
+                .collect::<String>()
+                .to_lowercase();
+            if !tag.is_empty() && !tags.contains(&tag) {
+                tags.push(tag);
+            }
+        }
+    }
+    tags.sort();
+    tags
+}
+
+fn meta_from_content(id: &str, content: &str, updated_at: u64, pinned: bool) -> NoteMeta {
     let mut lines = content.lines().filter(|l| !l.trim().is_empty());
     let title = lines
         .next()
@@ -52,6 +111,8 @@ fn meta_from_content(id: &str, content: &str, updated_at: u64) -> NoteMeta {
         title,
         preview,
         updated_at,
+        pinned,
+        tags: extract_tags(content),
     }
 }
 
@@ -62,9 +123,12 @@ fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
+// ---- Comandos ----
+
 #[tauri::command]
 pub fn list_notes(app: AppHandle) -> Result<Vec<NoteMeta>, String> {
     let dir = notes_dir(&app)?;
+    let pins = load_pins(&app);
     let mut notes = Vec::new();
     for entry in fs::read_dir(&dir).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
@@ -83,9 +147,14 @@ pub fn list_notes(app: AppHandle) -> Result<Vec<NoteMeta>, String> {
             .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
             .map(|d| d.as_millis() as u64)
             .unwrap_or(0);
-        notes.push(meta_from_content(id, &content, updated_at));
+        notes.push(meta_from_content(id, &content, updated_at, pins.contains(id)));
     }
-    notes.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+    // Fijadas primero; dentro de cada grupo, las más recientes arriba.
+    notes.sort_by(|a, b| {
+        b.pinned
+            .cmp(&a.pinned)
+            .then(b.updated_at.cmp(&a.updated_at))
+    });
     Ok(notes)
 }
 
@@ -103,10 +172,55 @@ pub fn save_note(app: AppHandle, id: String, content: String) -> Result<(), Stri
 pub fn create_note(app: AppHandle) -> Result<NoteMeta, String> {
     let id = uuid::Uuid::new_v4().to_string();
     fs::write(note_path(&app, &id)?, "").map_err(|e| e.to_string())?;
-    Ok(meta_from_content(&id, "", now_ms()))
+    Ok(meta_from_content(&id, "", now_ms(), false))
 }
 
 #[tauri::command]
 pub fn delete_note(app: AppHandle, id: String) -> Result<(), String> {
-    fs::remove_file(note_path(&app, &id)?).map_err(|e| e.to_string())
+    fs::remove_file(note_path(&app, &id)?).map_err(|e| e.to_string())?;
+    let mut pins = load_pins(&app);
+    if pins.remove(&id) {
+        save_pins(&app, &pins)?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::extract_tags;
+
+    #[test]
+    fn extrae_tags_y_omite_encabezados_y_codigo() {
+        let md = "# Título\n\
+                  Nota con #Trabajo y #casa-2.\n\
+                  ```\n\
+                  # comentario con #falso-tag\n\
+                  ```\n\
+                  Repetido: #trabajo";
+        assert_eq!(extract_tags(md), vec!["casa-2", "trabajo"]);
+    }
+
+    #[test]
+    fn sin_tags_devuelve_vacio() {
+        assert!(extract_tags("# Solo un título\ny texto normal").is_empty());
+    }
+}
+
+/// Alterna el estado de fijada de una nota y devuelve el nuevo estado.
+#[tauri::command]
+pub fn toggle_pin(app: AppHandle, id: String) -> Result<bool, String> {
+    // Valida el id y comprueba que la nota existe.
+    let path = note_path(&app, &id)?;
+    if !path.exists() {
+        return Err("la nota no existe".into());
+    }
+    let mut pins = load_pins(&app);
+    let pinned = if pins.remove(&id) {
+        false
+    } else {
+        pins.insert(id);
+        true
+    };
+    save_pins(&app, &pins)?;
+    Ok(pinned)
 }

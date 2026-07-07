@@ -5,6 +5,8 @@ export interface NoteMeta {
   title: string;
   preview: string;
   updated_at: number;
+  pinned: boolean;
+  tags: string[];
 }
 
 export function listNotes(): Promise<NoteMeta[]> {
@@ -25,6 +27,10 @@ export function createNote(): Promise<NoteMeta> {
 
 export function deleteNote(id: string): Promise<void> {
   return invoke("delete_note", { id });
+}
+
+export function togglePin(id: string): Promise<boolean> {
+  return invoke("toggle_pin", { id });
 }
 
 export function quitApp(): Promise<void> {

@@ -26,10 +26,17 @@
             spellcheck="false"
           />
         </div>
+        <div id="tags-bar" class="tags-bar hidden"></div>
         <ul id="notes-list" class="notes-list"></ul>
         <p id="empty-state" class="empty-state hidden">
           No hay notas todavía.<br />Pulsa ＋ para crear la primera.
         </p>
+        <footer class="list-footer">
+          <label class="autostart-label" title="Lanzar Notely automáticamente al iniciar sesión">
+            <input type="checkbox" id="autostart-toggle" />
+            Abrir al iniciar sesión
+          </label>
+        </footer>
       </section>
 
       <!-- Vista: editor de una nota -->
@@ -40,6 +47,7 @@
             <button id="toggle-preview-btn" class="pill-btn" title="Alternar vista previa (⌘E)">
               Vista previa
             </button>
+            <button id="pin-note-btn" class="icon-btn" title="Fijar nota arriba">📌</button>
             <button id="delete-note-btn" class="icon-btn danger" title="Eliminar nota">🗑</button>
           </div>
         </header>

@@ -6,8 +6,13 @@ Gestor de notas en **Markdown** que vive en el **menu bar de macOS**, construido
 
 - 🖥️ **Menu bar app**: un icono en la barra de menús abre un popover con tus notas. Sin icono en el Dock, sin ventanas por medio.
 - ✍️ **Markdown**: escribe con resaltado monoespaciado y alterna a vista previa renderizada (GFM: tablas, listas de tareas, etc.).
+- ☑️ **Checklists interactivas**: marca y desmarca las casillas `- [ ]` directamente en la vista previa; el cambio se escribe de vuelta en el Markdown.
+- 🎨 **Resaltado de sintaxis** en los bloques de código de la vista previa (highlight.js, temas claro y oscuro).
+- 🏷️ **Etiquetas**: escribe `#tag` en cualquier nota y aparecerá como filtro clicable sobre la lista; la búsqueda también encuentra tags.
+- 📌 **Notas fijadas**: ancla las importantes para que queden siempre arriba de la lista.
+- 🚀 **Abrir al iniciar sesión**: actívalo desde el pie de la lista de notas.
 - 💾 **Guardado automático**: las notas se guardan mientras escribes como archivos `.md` en `~/Library/Application Support/com.notely.app/notes/` — tuyas para siempre, sin formatos propietarios.
-- 🔍 **Búsqueda** instantánea por título y contenido.
+- 🔍 **Búsqueda** instantánea por título, contenido y etiquetas.
 - 🌗 Tema claro/oscuro automático según el sistema.
 
 ## Atajos de teclado
