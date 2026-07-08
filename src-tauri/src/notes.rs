@@ -5,8 +5,8 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use serde::Serialize;
-use tauri::{AppHandle, Manager};
+use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, Emitter, Manager};
 
 #[derive(Serialize)]
 pub struct NoteMeta {
@@ -62,6 +62,51 @@ fn save_pins(app: &AppHandle, pins: &HashSet<String>) -> Result<(), String> {
     fs::write(pins_path(app)?, json).map_err(|e| e.to_string())
 }
 
+/// Notifica a todas las ventanas (popover y widget) que las notas o sus
+/// metadatos cambiaron, para que refresquen su contenido.
+fn emit_notes_changed(app: &AppHandle) {
+    let _ = app.emit("notes-changed", ());
+}
+
+// ---- Ajustes ----
+
+#[derive(Serialize, Deserialize, Default)]
+pub struct Settings {
+    #[serde(default)]
+    pub widget_enabled: bool,
+}
+
+fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(data_dir(app)?.join("settings.json"))
+}
+
+pub fn load_settings(app: &AppHandle) -> Settings {
+    settings_path(app)
+        .ok()
+        .and_then(|p| fs::read_to_string(p).ok())
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
+fn save_settings(app: &AppHandle, settings: &Settings) -> Result<(), String> {
+    let json = serde_json::to_string(settings).map_err(|e| e.to_string())?;
+    fs::write(settings_path(app)?, json).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_widget_enabled(app: AppHandle) -> Result<bool, String> {
+    Ok(load_settings(&app).widget_enabled)
+}
+
+#[tauri::command]
+pub fn set_widget_enabled(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = load_settings(&app);
+    settings.widget_enabled = enabled;
+    save_settings(&app, &settings)?;
+    crate::apply_widget_visibility(&app, enabled);
+    Ok(())
+}
+
 // ---- Colores de etiquetas ----
 
 fn tag_colors_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -96,7 +141,9 @@ pub fn set_tag_color(app: AppHandle, tag: String, color: String) -> Result<(), S
     let mut colors = load_tag_colors(&app);
     colors.insert(tag, color.to_lowercase());
     let json = serde_json::to_string(&colors).map_err(|e| e.to_string())?;
-    fs::write(tag_colors_path(&app)?, json).map_err(|e| e.to_string())
+    fs::write(tag_colors_path(&app)?, json).map_err(|e| e.to_string())?;
+    emit_notes_changed(&app);
+    Ok(())
 }
 
 /// Elimina una etiqueta del registro de colores. Si ninguna nota la usa,
@@ -108,6 +155,7 @@ pub fn delete_tag_color(app: AppHandle, tag: String) -> Result<(), String> {
     if colors.remove(&tag).is_some() {
         let json = serde_json::to_string(&colors).map_err(|e| e.to_string())?;
         fs::write(tag_colors_path(&app)?, json).map_err(|e| e.to_string())?;
+        emit_notes_changed(&app);
     }
     Ok(())
 }
@@ -215,13 +263,16 @@ pub fn load_note(app: AppHandle, id: String) -> Result<String, String> {
 
 #[tauri::command]
 pub fn save_note(app: AppHandle, id: String, content: String) -> Result<(), String> {
-    fs::write(note_path(&app, &id)?, content).map_err(|e| e.to_string())
+    fs::write(note_path(&app, &id)?, content).map_err(|e| e.to_string())?;
+    emit_notes_changed(&app);
+    Ok(())
 }
 
 #[tauri::command]
 pub fn create_note(app: AppHandle) -> Result<NoteMeta, String> {
     let id = uuid::Uuid::new_v4().to_string();
     fs::write(note_path(&app, &id)?, "").map_err(|e| e.to_string())?;
+    emit_notes_changed(&app);
     Ok(meta_from_content(&id, "", now_ms(), false))
 }
 
@@ -232,6 +283,7 @@ pub fn delete_note(app: AppHandle, id: String) -> Result<(), String> {
     if pins.remove(&id) {
         save_pins(&app, &pins)?;
     }
+    emit_notes_changed(&app);
     Ok(())
 }
 
@@ -272,5 +324,6 @@ pub fn toggle_pin(app: AppHandle, id: String) -> Result<bool, String> {
         true
     };
     save_pins(&app, &pins)?;
+    emit_notes_changed(&app);
     Ok(pinned)
 }

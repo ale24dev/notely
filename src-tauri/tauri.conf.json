@@ -24,6 +24,23 @@
         "shadow": true,
         "alwaysOnTop": true,
         "skipTaskbar": true
+      },
+      {
+        "label": "widget",
+        "title": "Notely Widget",
+        "url": "widget.html",
+        "width": 300,
+        "height": 380,
+        "minWidth": 240,
+        "minHeight": 200,
+        "visible": false,
+        "resizable": true,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "alwaysOnBottom": true,
+        "visibleOnAllWorkspaces": true,
+        "skipTaskbar": true
       }
     ],
     "security": {

@@ -10,4 +10,12 @@ export default defineConfig({
       ignored: ["**/src-tauri/**"],
     },
   },
+  build: {
+    rollupOptions: {
+      input: {
+        main: "index.html",
+        widget: "widget.html",
+      },
+    },
+  },
 });

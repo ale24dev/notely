@@ -46,7 +46,17 @@ fn main() {
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
-        ));
+        ))
+        // Recuerda dónde dejó el usuario el widget de escritorio (el popover
+        // se reposiciona junto al tray en cada apertura, así que no le afecta).
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(
+                    tauri_plugin_window_state::StateFlags::POSITION
+                        | tauri_plugin_window_state::StateFlags::SIZE,
+                )
+                .build(),
+        );
 
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_nspanel::init());
@@ -55,6 +65,11 @@ fn main() {
     // del panel; en el resto de plataformas, el evento de foco de la ventana.
     #[cfg(not(target_os = "macos"))]
     let builder = builder.on_window_event(|window, event| {
+        // Solo el popover se cierra al perder el foco; el widget de
+        // escritorio permanece visible.
+        if window.label() != "main" {
+            return;
+        }
         if let tauri::WindowEvent::Focused(false) = event {
             if window.hide().is_ok() {
                 let state = window.state::<LastHide>();
@@ -67,6 +82,7 @@ fn main() {
         .manage(LastHide(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
             quit,
+            open_note,
             notes::list_notes,
             notes::load_note,
             notes::save_note,
@@ -75,7 +91,9 @@ fn main() {
             notes::toggle_pin,
             notes::get_tag_colors,
             notes::set_tag_color,
-            notes::delete_tag_color
+            notes::delete_tag_color,
+            notes::get_widget_enabled,
+            notes::set_widget_enabled
         ])
         .setup(|app| {
             // La app vive solo en el menu bar: sin icono en el Dock.
@@ -107,10 +125,34 @@ fn main() {
                 })
                 .build(app)?;
 
+            // Restaura el widget de escritorio si el usuario lo dejó activo.
+            if notes::load_settings(app.handle()).widget_enabled {
+                apply_widget_visibility(app.handle(), true);
+            }
+
             Ok(())
         })
         .run(tauri::generate_context!())
         .expect("error al iniciar Notely");
+}
+
+/// Muestra u oculta la ventana-widget del escritorio.
+pub fn apply_widget_visibility(app: &AppHandle, visible: bool) {
+    if let Some(widget) = app.get_webview_window("widget") {
+        if visible {
+            let _ = widget.show();
+        } else {
+            let _ = widget.hide();
+        }
+    }
+}
+
+/// Abre una nota concreta en el popover (invocado desde el widget).
+#[tauri::command]
+fn open_note(app: AppHandle, id: String) {
+    use tauri::Emitter;
+    let _ = app.emit_to("main", "open-note", id);
+    show_popover(&app);
 }
 
 #[tauri::command]
@@ -186,11 +228,20 @@ fn toggle_window(app: &AppHandle) {
         return;
     }
 
+    show_popover(app);
+}
+
+/// Muestra el popover: lo posiciona bajo el icono del tray (si hay una
+/// posición conocida) y lo ordena al frente como ventana clave sin activar
+/// la app, de modo que funciona incluso sobre apps a pantalla completa.
+#[cfg(target_os = "macos")]
+fn show_popover(app: &AppHandle) {
+    let Ok(panel) = app.get_webview_panel("main") else {
+        return;
+    };
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.move_window(Position::TrayCenter);
     }
-    // Ordena el panel al frente y lo hace ventana clave sin activar la app:
-    // el teclado funciona y la app a pantalla completa sigue activa debajo.
     panel.show_and_make_key();
 }
 
@@ -209,6 +260,14 @@ fn toggle_window(app: &AppHandle) {
         return;
     }
 
+    show_popover(app);
+}
+
+#[cfg(not(target_os = "macos"))]
+fn show_popover(app: &AppHandle) {
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
     let _ = window.move_window(Position::TrayCenter);
     let _ = window.show();
     let _ = window.set_focus();

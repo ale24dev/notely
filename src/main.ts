@@ -1,26 +1,24 @@
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
-import { marked } from "marked";
-import DOMPurify from "dompurify";
-import hljs from "highlight.js/lib/common";
-import "highlight.js/styles/github.css";
+import { PALETTE, colorForTag as colorFor, textOn } from "./colors";
+import { renderMarkdown, toggleTaskInContent } from "./markdown";
 import {
   createNote,
   deleteNote,
   deleteTagColor,
   getTagColors,
+  getWidgetEnabled,
   listNotes,
   loadNote,
   quitApp,
   saveNote,
   setTagColor,
+  setWidgetEnabled,
   togglePin,
   type NoteMeta,
 } from "./api";
 import { icons } from "./icons";
-
-marked.setOptions({ gfm: true, breaks: true });
 
 // ---- Elementos del DOM ----
 const listView = document.querySelector<HTMLElement>("#list-view")!;
@@ -39,6 +37,7 @@ const editor = document.querySelector<HTMLTextAreaElement>("#note-editor")!;
 const preview = document.querySelector<HTMLElement>("#note-preview")!;
 const saveStatus = document.querySelector<HTMLElement>("#save-status")!;
 const autostartToggle = document.querySelector<HTMLInputElement>("#autostart-toggle")!;
+const widgetToggle = document.querySelector<HTMLInputElement>("#widget-toggle")!;
 const editorTagPills = document.querySelector<HTMLElement>("#editor-tag-pills")!;
 const tagInput = document.querySelector<HTMLInputElement>("#tag-input")!;
 const tagsDatalist = document.querySelector<HTMLDataListElement>("#tags-datalist")!;
@@ -61,18 +60,6 @@ let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let dirty = false;
 
 // ---- Colores de etiquetas ----
-// Paleta de colores de sistema de Apple (Human Interface Guidelines).
-const PALETTE = [
-  "#ff3b30", // rojo
-  "#ff9500", // naranja
-  "#ffcc00", // amarillo
-  "#34c759", // verde
-  "#00c7be", // menta
-  "#007aff", // azul
-  "#af52de", // morado
-  "#ff2d55", // rosa
-  "#8e8e93", // gris
-];
 
 /// Todas las etiquetas visibles: las usadas en notas más las creadas
 /// explícitamente (registradas en tagColors aunque aún no se usen).
@@ -110,24 +97,8 @@ function extractTags(content: string): string[] {
   return tags.sort();
 }
 
-/// Color de una etiqueta: el elegido por el usuario o, por defecto, uno
-/// estable derivado del nombre (hash djb2 sobre la paleta).
 function colorForTag(tag: string): string {
-  const custom = tagColors[tag];
-  if (custom) return custom;
-  let hash = 5381;
-  for (let i = 0; i < tag.length; i++) {
-    hash = ((hash << 5) + hash + tag.charCodeAt(i)) >>> 0;
-  }
-  return PALETTE[hash % PALETTE.length];
-}
-
-/// Color de texto legible sobre un fondo hex dado.
-function textOn(hex: string): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return 0.299 * r + 0.587 * g + 0.114 * b > 160 ? "#1d1d1f" : "#ffffff";
+  return colorFor(tag, tagColors);
 }
 
 // Selector de color flotante, compartido por todos los chips.
@@ -494,47 +465,15 @@ async function flushSave() {
 
 // ---- Vista previa: Markdown + checklists interactivas + resaltado ----
 function renderPreview() {
-  const html = marked.parse(editor.value) as string;
-  preview.innerHTML = DOMPurify.sanitize(html);
-
-  // Las checklists de la vista previa se pueden marcar/desmarcar y el
-  // cambio se escribe de vuelta en el Markdown.
-  const boxes = preview.querySelectorAll<HTMLInputElement>('li input[type="checkbox"]');
-  boxes.forEach((box, index) => {
-    box.disabled = false;
-    box.addEventListener("change", () => toggleTask(index));
-  });
-
-  for (const block of preview.querySelectorAll<HTMLElement>("pre code")) {
-    hljs.highlightElement(block);
-  }
+  renderMarkdown(preview, editor.value, toggleTask);
 }
 
-/// Alterna la n-ésima casilla `[ ]`/`[x]` del Markdown, ignorando bloques
-/// de código (que no se renderizan como checkboxes).
 function toggleTask(index: number) {
-  const lines = editor.value.split("\n");
-  const taskRe = /^(\s*(?:[-*+]|\d+[.)])\s+\[)([ xX])(\])/;
-  let count = -1;
-  let inFence = false;
-  for (let i = 0; i < lines.length; i++) {
-    if (/^\s*(```|~~~)/.test(lines[i])) {
-      inFence = !inFence;
-      continue;
-    }
-    if (inFence) continue;
-    const m = lines[i].match(taskRe);
-    if (!m) continue;
-    count++;
-    if (count === index) {
-      const toggled = m[2] === " " ? "x" : " ";
-      lines[i] = m[1] + toggled + m[3] + lines[i].slice(m[0].length);
-      editor.value = lines.join("\n");
-      scheduleSave();
-      renderPreview();
-      return;
-    }
-  }
+  const updated = toggleTaskInContent(editor.value, index);
+  if (updated === null) return;
+  editor.value = updated;
+  scheduleSave();
+  renderPreview();
 }
 
 function setPreviewMode(on: boolean) {
@@ -605,6 +544,22 @@ async function initAutostart() {
   });
 }
 
+// ---- Widget de escritorio ----
+async function initWidgetToggle() {
+  try {
+    widgetToggle.checked = await getWidgetEnabled();
+  } catch {
+    // Sin ajuste guardado; se deja apagado.
+  }
+  widgetToggle.addEventListener("change", async () => {
+    try {
+      await setWidgetEnabled(widgetToggle.checked);
+    } catch {
+      widgetToggle.checked = !widgetToggle.checked;
+    }
+  });
+}
+
 // ---- Eventos ----
 newNoteBtn.addEventListener("click", newNote);
 quitBtn.addEventListener("click", quit);
@@ -670,6 +625,17 @@ void listen("panel-blur", () => {
   void flushSave();
 });
 
+// El widget de escritorio pide abrir una nota en el popover.
+void listen<string>("open-note", (event) => {
+  void openNote(event.payload);
+});
+
+// Las notas cambiaron desde otra ventana (p. ej. checkbox marcado en el
+// widget): refresca la lista si no hay una nota abierta en el editor.
+void listen("notes-changed", () => {
+  if (currentId === null) void refreshList();
+});
+
 // Tab inserta tabulación en lugar de mover el foco.
 editor.addEventListener("keydown", (e) => {
   if (e.key === "Tab") {
@@ -692,3 +658,4 @@ async function init() {
 
 void init();
 void initAutostart();
+void initWidgetToggle();

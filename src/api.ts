@@ -45,6 +45,18 @@ export function deleteTagColor(tag: string): Promise<void> {
   return invoke("delete_tag_color", { tag });
 }
 
+export function getWidgetEnabled(): Promise<boolean> {
+  return invoke("get_widget_enabled");
+}
+
+export function setWidgetEnabled(enabled: boolean): Promise<void> {
+  return invoke("set_widget_enabled", { enabled });
+}
+
+export function openNoteInPopover(id: string): Promise<void> {
+  return invoke("open_note", { id });
+}
+
 export function quitApp(): Promise<void> {
   return invoke("quit");
 }
