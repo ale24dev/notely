@@ -1,3 +1,4 @@
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { marked } from "marked";
@@ -660,8 +661,12 @@ document.addEventListener("keydown", (e) => {
 });
 
 // Guarda los cambios pendientes cuando la ventana pierde el foco
-// (p. ej. al cerrarse el popover al hacer clic fuera).
+// (p. ej. al cerrarse el popover al hacer clic fuera). En macOS el panel
+// emite "panel-blur" desde Rust; en otras plataformas llega tauri://blur.
 void getCurrentWindow().listen("tauri://blur", () => {
+  void flushSave();
+});
+void listen("panel-blur", () => {
   void flushSave();
 });
 

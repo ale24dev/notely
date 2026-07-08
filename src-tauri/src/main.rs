@@ -14,17 +14,56 @@ use tauri::{
 };
 use tauri_plugin_positioner::{Position, WindowExt};
 
+#[cfg(target_os = "macos")]
+use tauri_nspanel::{
+    tauri_panel, CollectionBehavior, ManagerExt, PanelLevel, StyleMask, WebviewWindowExt,
+};
+
+// En macOS la ventana se convierte en un NSPanel no activante: es la única
+// forma fiable de mostrarla sobre apps a pantalla completa sin activar
+// Notely ni provocar un cambio de Space.
+#[cfg(target_os = "macos")]
+tauri_panel! {
+    panel!(NotelyPanel {
+        config: {
+            can_become_key_window: true,
+            is_floating_panel: true
+        }
+    })
+
+    panel_event!(NotelyPanelEvents {
+        window_did_resign_key(notification: &NSNotification) -> ()
+    })
+}
+
 /// Momento en que el popover se ocultó por última vez al perder el foco.
 /// Permite distinguir "clic en el icono para cerrar" de "clic para abrir".
 struct LastHide(Mutex<Option<Instant>>);
 
 fn main() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_positioner::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
-        ))
+        ));
+
+    #[cfg(target_os = "macos")]
+    let builder = builder.plugin(tauri_nspanel::init());
+
+    // En macOS el cierre al perder foco lo gestiona window_did_resign_key
+    // del panel; en el resto de plataformas, el evento de foco de la ventana.
+    #[cfg(not(target_os = "macos"))]
+    let builder = builder.on_window_event(|window, event| {
+        if let tauri::WindowEvent::Focused(false) = event {
+            if window.hide().is_ok() {
+                let state = window.state::<LastHide>();
+                *state.0.lock().unwrap() = Some(Instant::now());
+            }
+        }
+    });
+
+    builder
         .manage(LastHide(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
             quit,
@@ -41,13 +80,9 @@ fn main() {
         .setup(|app| {
             // La app vive solo en el menu bar: sin icono en el Dock.
             #[cfg(target_os = "macos")]
-            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-
-            // El popover debe poder mostrarse sobre apps a pantalla completa
-            // y en cualquier Space, como los popovers nativos del menu bar.
-            #[cfg(target_os = "macos")]
-            if let Some(window) = app.get_webview_window("main") {
-                configure_macos_panel(&window);
+            {
+                app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+                setup_macos_panel(app.handle())?;
             }
 
             let tray_icon = tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png"))?;
@@ -55,7 +90,7 @@ fn main() {
             // Sin menú nativo: si el tray tiene un menú adjunto, macOS puede
             // quedarse los clics para mostrarlo y la ventana nunca se abre.
             // Cualquier clic (izquierdo o derecho) alterna el popover; salir
-            // de la app se hace desde la propia UI (botón ⏻ o ⌘Q).
+            // de la app se hace desde la propia UI (botón de apagado o ⌘Q).
             TrayIconBuilder::with_id("main-tray")
                 .icon(tray_icon)
                 .icon_as_template(true)
@@ -74,15 +109,6 @@ fn main() {
 
             Ok(())
         })
-        .on_window_event(|window, event| {
-            // Comportamiento de popover: se oculta al hacer clic fuera.
-            if let tauri::WindowEvent::Focused(false) = event {
-                if window.hide().is_ok() {
-                    let state = window.state::<LastHide>();
-                    *state.0.lock().unwrap() = Some(Instant::now());
-                }
-            }
-        })
         .run(tauri::generate_context!())
         .expect("error al iniciar Notely");
 }
@@ -92,30 +118,83 @@ fn quit(app: AppHandle) {
     app.exit(0);
 }
 
-/// Configura la NSWindow como panel auxiliar del menu bar: puede unirse a
-/// cualquier Space (incluidos los de pantalla completa, gracias a
-/// FullScreenAuxiliary) y flota al nivel de la barra de estado. Sin esto,
-/// macOS no muestra la ventana cuando la app activa está a pantalla
-/// completa.
+/// Convierte la ventana principal en un panel del menu bar: no activante
+/// (no roba el foco de la app en uso), visible en cualquier Space incluidos
+/// los de pantalla completa, y flotando al nivel de la barra de estado.
 #[cfg(target_os = "macos")]
-fn configure_macos_panel(window: &tauri::WebviewWindow) {
-    use objc2_app_kit::{NSWindow, NSWindowCollectionBehavior};
+fn setup_macos_panel(app: &AppHandle) -> tauri::Result<()> {
+    let window = app
+        .get_webview_window("main")
+        .expect("la ventana principal debe existir");
+    let panel = window.to_panel::<NotelyPanel>()?;
 
-    let Ok(ns_ptr) = window.ns_window() else {
-        return;
-    };
-    // Puntero válido durante toda la vida de la ventana; solo se usa aquí,
-    // en el hilo principal (setup), como exige AppKit.
-    let ns_window = unsafe { &*(ns_ptr as *const NSWindow) };
-    ns_window.setCollectionBehavior(
-        NSWindowCollectionBehavior::CanJoinAllSpaces
-            | NSWindowCollectionBehavior::FullScreenAuxiliary,
+    panel.set_level(PanelLevel::Status.value());
+    panel.set_style_mask(StyleMask::empty().nonactivating_panel().into());
+    panel.set_collection_behavior(
+        CollectionBehavior::new()
+            .can_join_all_spaces()
+            .full_screen_auxiliary()
+            .into(),
     );
-    // NSStatusWindowLevel: por encima de las ventanas normales y de las
-    // barras de las apps a pantalla completa.
-    ns_window.setLevel(25);
+    panel.set_hides_on_deactivate(false);
+
+    // Comportamiento de popover: se oculta al dejar de ser ventana clave
+    // (clic fuera, cambio de app…).
+    let events = NotelyPanelEvents::new();
+    let handle = app.clone();
+    events.window_did_resign_key(move |_notification| {
+        // El panel sustituye al delegate de tao, así que el frontend ya no
+        // recibe tauri://blur: se avisa con un evento propio para que
+        // guarde los cambios pendientes antes de ocultarse.
+        use tauri::Emitter;
+        let _ = handle.emit("panel-blur", ());
+        if let Ok(panel) = handle.get_webview_panel("main") {
+            if panel.is_visible() {
+                panel.hide();
+                let state = handle.state::<LastHide>();
+                *state.0.lock().unwrap() = Some(Instant::now());
+            }
+        }
+    });
+    panel.set_event_handler(Some(events.as_ref()));
+
+    Ok(())
 }
 
+/// ¿Se ocultó el popover hace un instante? Si es así, el blur lo provocó el
+/// mismo clic en el icono que estamos procesando: el usuario quería cerrar.
+fn just_hidden(app: &AppHandle) -> bool {
+    app.state::<LastHide>()
+        .0
+        .lock()
+        .unwrap()
+        .is_some_and(|t| t.elapsed() < Duration::from_millis(300))
+}
+
+#[cfg(target_os = "macos")]
+fn toggle_window(app: &AppHandle) {
+    let Ok(panel) = app.get_webview_panel("main") else {
+        return;
+    };
+
+    if panel.is_visible() {
+        panel.hide();
+        return;
+    }
+
+    if just_hidden(app) {
+        return;
+    }
+
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.move_window(Position::TrayCenter);
+    }
+    // Ordena el panel al frente y lo hace ventana clave sin activar la app:
+    // el teclado funciona y la app a pantalla completa sigue activa debajo.
+    panel.show_and_make_key();
+}
+
+#[cfg(not(target_os = "macos"))]
 fn toggle_window(app: &AppHandle) {
     let Some(window) = app.get_webview_window("main") else {
         return;
@@ -126,15 +205,7 @@ fn toggle_window(app: &AppHandle) {
         return;
     }
 
-    // Si el popover acaba de ocultarse por el blur provocado por este mismo
-    // clic en el icono, el usuario quería cerrarlo: no lo reabrimos.
-    let state = app.state::<LastHide>();
-    let just_hidden = state
-        .0
-        .lock()
-        .unwrap()
-        .is_some_and(|t| t.elapsed() < Duration::from_millis(300));
-    if just_hidden {
+    if just_hidden(app) {
         return;
     }
 
