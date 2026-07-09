@@ -814,6 +814,7 @@ impl<'a, R: Runtime + 'a, T: FromWindow<R> + 'static> PanelBuilder<'a, R, T> {
     /// an NSPanel, and applies all panel-specific settings.
     pub fn build(self) -> tauri::Result<Arc<dyn Panel<R>>> {
         // Handle no_activate option by temporarily changing activation policy
+        #[allow(unused_unsafe)]
         let original_policy = if self.panel_config.no_activate.unwrap_or(false) {
             MainThreadMarker::new().map(|mtm| unsafe {
                 let app = NSApplication::sharedApplication(mtm);
