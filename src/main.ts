@@ -1,6 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { PALETTE, colorForTag as colorFor, textOn } from "./colors";
 import { renderMarkdown, toggleTaskInContent } from "./markdown";
 import {
@@ -11,6 +12,7 @@ import {
   getWidgetEnabled,
   listNotes,
   loadNote,
+  pasteFromClipboard,
   quitApp,
   saveNote,
   setTagColor,
@@ -592,8 +594,62 @@ tagInput.addEventListener("change", () => {
   tagInput.value = "";
 });
 
+// ---- Portapapeles ----
+// Una menubar app sin foco de aplicación no siempre recibe los atajos de
+// edición nativos, así que se implementan a mano para cualquier campo.
+type TextField = HTMLInputElement | HTMLTextAreaElement;
+
+function activeTextField(): TextField | null {
+  const el = document.activeElement;
+  return el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement ? el : null;
+}
+
+function insertIntoField(field: TextField, text: string) {
+  const start = field.selectionStart ?? field.value.length;
+  const end = field.selectionEnd ?? field.value.length;
+  field.value = field.value.slice(0, start) + text + field.value.slice(end);
+  field.selectionStart = field.selectionEnd = start + text.length;
+  field.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+async function pasteIntoField(field: TextField) {
+  const result = await pasteFromClipboard();
+  if (result.kind === "text") {
+    insertIntoField(field, result.text);
+  } else if (result.kind === "image" && field === editor) {
+    // Las imágenes solo tienen sentido dentro de la nota.
+    insertIntoField(field, result.markdown);
+  }
+}
+
+async function copySelection(field: TextField, cut: boolean) {
+  const start = field.selectionStart ?? 0;
+  const end = field.selectionEnd ?? 0;
+  if (start === end) return;
+  await writeText(field.value.slice(start, end));
+  if (cut) insertIntoField(field, "");
+}
+
 document.addEventListener("keydown", (e) => {
   const cmd = e.metaKey || e.ctrlKey;
+  const field = activeTextField();
+  if (cmd && field !== null && !e.shiftKey && !e.altKey) {
+    if (e.key === "v") {
+      e.preventDefault();
+      void pasteIntoField(field);
+      return;
+    }
+    if (e.key === "c" || e.key === "x") {
+      e.preventDefault();
+      void copySelection(field, e.key === "x");
+      return;
+    }
+    if (e.key === "a") {
+      e.preventDefault();
+      field.select();
+      return;
+    }
+  }
   if (cmd && e.key === "q") {
     e.preventDefault();
     void quit();

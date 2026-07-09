@@ -14,7 +14,12 @@ export function renderMarkdown(
   onToggleTask?: (index: number) => void,
 ): void {
   const html = marked.parse(content) as string;
-  target.innerHTML = DOMPurify.sanitize(html);
+  // Igual que el regex por defecto de DOMPurify, más el esquema notely:
+  // con el que la app sirve las imágenes pegadas.
+  target.innerHTML = DOMPurify.sanitize(html, {
+    ALLOWED_URI_REGEXP:
+      /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|notely):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i,
+  });
 
   if (onToggleTask) {
     const boxes = target.querySelectorAll<HTMLInputElement>('li input[type="checkbox"]');

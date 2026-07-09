@@ -68,6 +68,56 @@ fn emit_notes_changed(app: &AppHandle) {
     let _ = app.emit("notes-changed", ());
 }
 
+// ---- Adjuntos (imágenes pegadas) ----
+
+pub fn attachments_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = data_dir(app)?.join("attachments");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
+}
+
+/// Resultado de pegar desde el portapapeles: texto tal cual, o una imagen
+/// ya guardada como adjunto con su referencia Markdown lista para insertar.
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum PasteResult {
+    Text { text: String },
+    Image { markdown: String },
+    Empty,
+}
+
+#[tauri::command]
+pub fn paste_from_clipboard(app: AppHandle) -> Result<PasteResult, String> {
+    use tauri_plugin_clipboard_manager::ClipboardExt;
+
+    let clipboard = app.clipboard();
+
+    // Primero imagen (una captura de pantalla copiada suele traer también
+    // texto irrelevante); si no hay, texto.
+    if let Ok(image) = clipboard.read_image() {
+        let name = format!("{}.png", uuid::Uuid::new_v4());
+        let path = attachments_dir(&app)?.join(&name);
+        let file = fs::File::create(&path).map_err(|e| e.to_string())?;
+        let mut encoder =
+            png::Encoder::new(std::io::BufWriter::new(file), image.width(), image.height());
+        encoder.set_color(png::ColorType::Rgba);
+        encoder.set_depth(png::BitDepth::Eight);
+        let mut writer = encoder.write_header().map_err(|e| e.to_string())?;
+        writer
+            .write_image_data(image.rgba())
+            .map_err(|e| e.to_string())?;
+        return Ok(PasteResult::Image {
+            markdown: format!("![imagen](notely://attachments/{name})"),
+        });
+    }
+
+    if let Ok(text) = clipboard.read_text() {
+        return Ok(PasteResult::Text { text });
+    }
+
+    Ok(PasteResult::Empty)
+}
+
 // ---- Ajustes ----
 
 #[derive(Serialize, Deserialize, Default)]

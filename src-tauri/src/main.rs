@@ -47,6 +47,7 @@ fn main() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
+        .plugin(tauri_plugin_clipboard_manager::init())
         // Recuerda dónde dejó el usuario el widget de escritorio (el popover
         // se reposiciona junto al tray en cada apertura, así que no le afecta).
         .plugin(
@@ -56,7 +57,43 @@ fn main() {
                         | tauri_plugin_window_state::StateFlags::SIZE,
                 )
                 .build(),
-        );
+        )
+        // Protocolo notely:// para servir las imágenes pegadas en las notas
+        // (guardadas en el directorio de adjuntos de la app).
+        .register_uri_scheme_protocol("notely", |ctx, request| {
+            let not_found = || {
+                tauri::http::Response::builder()
+                    .status(404)
+                    .body(Vec::new())
+                    .unwrap()
+            };
+
+            let uri = request.uri();
+            if uri.host() != Some("attachments") {
+                return not_found();
+            }
+            let name = uri.path().trim_start_matches('/');
+            // Solo nombres generados por la app: nada de rutas ni escapes.
+            let valid = !name.is_empty()
+                && name
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '.')
+                && !name.contains("..");
+            if !valid {
+                return not_found();
+            }
+
+            let Ok(dir) = notes::attachments_dir(ctx.app_handle()) else {
+                return not_found();
+            };
+            match std::fs::read(dir.join(name)) {
+                Ok(bytes) => tauri::http::Response::builder()
+                    .header("Content-Type", "image/png")
+                    .body(bytes)
+                    .unwrap(),
+                Err(_) => not_found(),
+            }
+        });
 
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_nspanel::init());
@@ -93,7 +130,8 @@ fn main() {
             notes::set_tag_color,
             notes::delete_tag_color,
             notes::get_widget_enabled,
-            notes::set_widget_enabled
+            notes::set_widget_enabled,
+            notes::paste_from_clipboard
         ])
         .setup(|app| {
             // La app vive solo en el menu bar: sin icono en el Dock.
@@ -101,6 +139,22 @@ fn main() {
             {
                 app.set_activation_policy(tauri::ActivationPolicy::Accessory);
                 setup_macos_panel(app.handle())?;
+
+                // Menú de edición: sin él, macOS no enruta ⌘V/⌘C/⌘X/⌘A al
+                // webview. No se ve (app Accessory) pero habilita los atajos.
+                use tauri::menu::{MenuBuilder, SubmenuBuilder};
+                let edit = SubmenuBuilder::new(app, "Edición")
+                    .undo()
+                    .redo()
+                    .separator()
+                    .cut()
+                    .copy()
+                    .paste()
+                    .separator()
+                    .select_all()
+                    .build()?;
+                let menu = MenuBuilder::new(app).item(&edit).build()?;
+                app.set_menu(menu)?;
             }
 
             let tray_icon = tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png"))?;

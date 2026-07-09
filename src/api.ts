@@ -57,6 +57,15 @@ export function openNoteInPopover(id: string): Promise<void> {
   return invoke("open_note", { id });
 }
 
+export type PasteResult =
+  | { kind: "text"; text: string }
+  | { kind: "image"; markdown: string }
+  | { kind: "empty" };
+
+export function pasteFromClipboard(): Promise<PasteResult> {
+  return invoke("paste_from_clipboard");
+}
+
 export function quitApp(): Promise<void> {
   return invoke("quit");
 }
