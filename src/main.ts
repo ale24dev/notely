@@ -383,6 +383,7 @@ function addTagToNote(tag: string) {
     }
     editor.value = lines.join("\n");
   }
+  recordChange(true);
   scheduleSave();
   renderEditorTags();
 }
@@ -417,6 +418,7 @@ function removeTagFromNote(tag: string) {
     if (cleaned.trim() !== "") result.push(cleaned);
   }
   editor.value = result.join("\n").replace(/\n+$/, "\n").replace(/^\n+/, "");
+  recordChange(true);
   scheduleSave();
   renderEditorTags();
 }
@@ -427,11 +429,76 @@ function isTagToken(token: string, tag: string): boolean {
   return match !== null && match[0].toLowerCase() === tag;
 }
 
+// ---- Historial de deshacer/rehacer del editor ----
+// El deshacer nativo del textarea no sobrevive a las ediciones
+// programáticas (pegar, checkboxes, etiquetas) ni al enrutado de atajos de
+// una menubar app, así que se lleva un historial propio por nota.
+let undoStack: string[] = [];
+let redoStack: string[] = [];
+let historyValue = "";
+let lastSnapshot = 0;
+
+function resetHistory() {
+  undoStack = [];
+  redoStack = [];
+  historyValue = editor.value;
+  lastSnapshot = 0;
+}
+
+/// Registra el estado previo del editor tras un cambio. Las ráfagas de
+/// tecleo (<600 ms entre pulsaciones) se agrupan en un solo paso; las
+/// ediciones programáticas fuerzan su propio paso con `force`.
+function recordChange(force = false) {
+  if (editor.value === historyValue) return;
+  const now = Date.now();
+  if (force || now - lastSnapshot > 600) {
+    undoStack.push(historyValue);
+    if (undoStack.length > 200) undoStack.shift();
+  }
+  lastSnapshot = now;
+  redoStack = [];
+  historyValue = editor.value;
+}
+
+function undo() {
+  const previous = undoStack.pop();
+  if (previous === undefined) return;
+  redoStack.push(editor.value);
+  applyHistory(previous);
+}
+
+function redo() {
+  const next = redoStack.pop();
+  if (next === undefined) return;
+  undoStack.push(editor.value);
+  applyHistory(next);
+}
+
+function applyHistory(value: string) {
+  const cursor = firstDiffIndex(editor.value, value);
+  editor.value = value;
+  historyValue = value;
+  lastSnapshot = Date.now();
+  editor.selectionStart = editor.selectionEnd = Math.min(cursor, value.length);
+  editor.focus();
+  scheduleSave();
+  renderEditorTags();
+}
+
+function firstDiffIndex(a: string, b: string): number {
+  const len = Math.min(a.length, b.length);
+  for (let i = 0; i < len; i++) {
+    if (a[i] !== b[i]) return i;
+  }
+  return len;
+}
+
 // ---- Editor ----
 async function openNote(id: string) {
   currentId = id;
   currentPinned = notes.find((n) => n.id === id)?.pinned ?? false;
   editor.value = await loadNote(id);
+  resetHistory();
   dirty = false;
   saveStatus.textContent = "";
   updatePinButton();
@@ -474,6 +541,7 @@ function toggleTask(index: number) {
   const updated = toggleTaskInContent(editor.value, index);
   if (updated === null) return;
   editor.value = updated;
+  recordChange(true);
   scheduleSave();
   renderPreview();
 }
@@ -570,6 +638,7 @@ deleteBtn.addEventListener("click", removeCurrentNote);
 pinBtn.addEventListener("click", togglePinCurrent);
 previewBtn.addEventListener("click", () => setPreviewMode(!previewMode));
 editor.addEventListener("input", () => {
+  recordChange();
   scheduleSave();
   renderEditorTags();
 });
@@ -605,6 +674,9 @@ function activeTextField(): TextField | null {
 }
 
 function insertIntoField(field: TextField, text: string) {
+  // Pegar/cortar en el editor merece su propio paso de deshacer, aunque
+  // llegue en medio de una ráfaga de tecleo.
+  if (field === editor) lastSnapshot = 0;
   const start = field.selectionStart ?? field.value.length;
   const end = field.selectionEnd ?? field.value.length;
   field.value = field.value.slice(0, start) + text + field.value.slice(end);
@@ -634,6 +706,23 @@ async function copySelection(field: TextField, cut: boolean) {
 document.addEventListener("keydown", (e) => {
   const cmd = e.metaKey || e.ctrlKey;
   const field = activeTextField();
+  // Deshacer/rehacer del editor: ⌘Z / ⇧⌘Z (también ⌘Y para rehacer).
+  if (cmd && field === editor && !e.altKey) {
+    if (e.key.toLowerCase() === "z") {
+      e.preventDefault();
+      if (e.shiftKey) {
+        redo();
+      } else {
+        undo();
+      }
+      return;
+    }
+    if (e.key.toLowerCase() === "y" && !e.shiftKey) {
+      e.preventDefault();
+      redo();
+      return;
+    }
+  }
   if (cmd && field !== null && !e.shiftKey && !e.altKey) {
     if (e.key === "v") {
       e.preventDefault();
@@ -700,6 +789,7 @@ editor.addEventListener("keydown", (e) => {
     const { selectionStart, selectionEnd, value } = editor;
     editor.value = value.slice(0, selectionStart) + "  " + value.slice(selectionEnd);
     editor.selectionStart = editor.selectionEnd = selectionStart + 2;
+    recordChange(true);
     scheduleSave();
   }
 });

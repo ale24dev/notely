@@ -22,6 +22,7 @@ Gestor de notas en **Markdown** que vive en el **menu bar de macOS**, construido
 | --- | --- |
 | `⌘N` | Nueva nota |
 | `⌘E` | Alternar editor / vista previa |
+| `⌘Z` / `⇧⌘Z` | Deshacer / rehacer en el editor (historial propio que cubre también pegados, checkboxes y etiquetas) |
 | `Esc` | Volver a la lista · cerrar el popover |
 | `⌘Q` | Salir de la app |
 

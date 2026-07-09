@@ -142,11 +142,11 @@ fn main() {
 
                 // Menú de edición: sin él, macOS no enruta ⌘V/⌘C/⌘X/⌘A al
                 // webview. No se ve (app Accessory) pero habilita los atajos.
+                // Sin ítems de deshacer/rehacer: los gestiona la app con su
+                // propio historial (el nativo se rompe con las ediciones
+                // programáticas) y el menú los interceptaría.
                 use tauri::menu::{MenuBuilder, SubmenuBuilder};
                 let edit = SubmenuBuilder::new(app, "Edición")
-                    .undo()
-                    .redo()
-                    .separator()
                     .cut()
                     .copy()
                     .paste()
