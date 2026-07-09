@@ -617,20 +617,9 @@ async function pasteIntoField(field: TextField) {
   if (result.kind === "text") {
     insertIntoField(field, result.text);
   } else if (result.kind === "image" && field === editor) {
-    // Las imágenes solo tienen sentido dentro de la nota. Tras pegar, se
-    // cambia a la vista previa para ver la imagen al momento, desplazada
-    // a la vista en cuanto carga.
+    // Las imágenes solo tienen sentido dentro de la nota; se inserta la
+    // referencia y el usuario decide cuándo abrir la vista previa.
     insertIntoField(field, result.markdown);
-    setPreviewMode(true);
-    const src = result.markdown.match(/\((.+)\)/)?.[1];
-    if (src) {
-      const img = preview.querySelector<HTMLImageElement>(`img[src="${CSS.escape(src)}"]`);
-      if (img) {
-        const scroll = () => img.scrollIntoView({ block: "center" });
-        scroll();
-        if (!img.complete) img.addEventListener("load", scroll, { once: true });
-      }
-    }
   }
 }
 
