@@ -143,6 +143,9 @@ fn main() {
             notes::paste_from_clipboard
         ])
         .setup(|app| {
+            // Trae las notas guardadas bajo el identifier antiguo, si las hay.
+            notes::migrate_legacy_data(app.handle());
+
             // La app vive solo en el menu bar: sin icono en el Dock.
             #[cfg(target_os = "macos")]
             {

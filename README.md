@@ -12,7 +12,7 @@ Gestor de notas en **Markdown** que vive en el **menu bar de macOS**, construido
 - 📌 **Notas fijadas**: ancla las importantes para que queden siempre arriba de la lista.
 - 🖼️ **Widget de escritorio**: activa "Widget en el escritorio" en el pie de la lista y tus notas fijadas aparecen en un panel pegado al escritorio (siempre detrás de las demás ventanas, visible en todos los Spaces). Muestra las checklists interactivas — marca tareas sin abrir la app —, se actualiza en vivo cuando cambian las notas, se puede arrastrar desde su cabecera y recuerda su posición. Clic en el título de una nota para abrirla en el popover. No usa WidgetKit (los widgets nativos de macOS requieren una extensión Swift firmada con Xcode); es una ventana de la propia app que se comporta como un widget.
 - 📋 **Pegar texto e imágenes**: `⌘V` pega texto donde esté el cursor, y si el portapapeles trae una imagen (una captura, algo copiado de una web…) se guarda como PNG en el directorio de adjuntos y se inserta como `![imagen](notely://attachments/…)`; ábrela en la vista previa (`⌘E`) para verla. También se ve en el widget. `⌘C`/`⌘X`/`⌘A` también funcionan en cualquier campo.
-- 💾 **Guardado automático**: las notas se guardan mientras escribes como archivos `.md` en `~/Library/Application Support/com.notely.app/notes/` — tuyas para siempre, sin formatos propietarios.
+- 💾 **Guardado automático**: las notas se guardan mientras escribes como archivos `.md` en `~/Library/Application Support/com.ale24dev.notely/notes/` — tuyas para siempre, sin formatos propietarios.
 - 🔍 **Búsqueda** instantánea por título, contenido y etiquetas.
 - 🌗 Tema claro/oscuro automático según el sistema.
 
@@ -53,26 +53,32 @@ en `src-tauri/vendor/`), funciona con App Sandbox, y en el build sandboxeado
 la opción "Abrir al iniciar sesión" se oculta sola (los LaunchAgents no están
 permitidos ahí).
 
-Con tu cuenta del Apple Developer Program:
+Con tu cuenta del Apple Developer Program (Team ID `9FU3PGG489` ya
+configurado como valor por defecto):
 
-1. Cambia el `identifier` de `src-tauri/tauri.conf.json` por el tuyo y
-   registra ese App ID en el portal de desarrolladores.
-2. Crea la app en App Store Connect, instala los certificados
-   **Apple Distribution** y **3rd Party Mac Developer Installer** en el
-   llavero, y descarga un provisioning profile de tipo *Mac App Store*.
+1. Registra el App ID `com.ale24dev.notely` en el portal de desarrolladores
+   y crea la app en App Store Connect.
+2. Instala los certificados **Apple Distribution** y **Mac Installer
+   Distribution** en el llavero (Xcode → Settings → Accounts → Manage
+   Certificates → ＋) y descarga en `~/Downloads` un provisioning profile de
+   tipo *Mac App Store* para ese App ID.
 3. Ejecuta:
 
 ```bash
-export APPLE_TEAM_ID="ABCDE12345"
-export APPLE_SIGNING_IDENTITY="Apple Distribution: Tu Nombre (ABCDE12345)"
-export APPLE_INSTALLER_IDENTITY="3rd Party Mac Developer Installer: Tu Nombre (ABCDE12345)"
-export APPLE_PROVISIONING_PROFILE="$HOME/Downloads/Notely_MacAppStore.provisionprofile"
 ./scripts/build-appstore.sh
 ```
+
+El script detecta solo los certificados en el llavero y el provisioning
+profile más reciente de `~/Downloads` (todo se puede fijar por variables de
+entorno: `APPLE_TEAM_ID`, `APPLE_SIGNING_IDENTITY`,
+`APPLE_INSTALLER_IDENTITY`, `APPLE_PROVISIONING_PROFILE`).
 
 4. Sube el `.pkg` resultante con la app **Transporter** y completa la ficha
    en App Store Connect (capturas, descripción, privacidad) antes de enviar
    a revisión.
+
+Al cambiar el identifier, la app migra automáticamente las notas guardadas
+bajo el antiguo (`com.notely.app`) la primera vez que arranca.
 
 ## Estructura
 

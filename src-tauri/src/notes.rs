@@ -26,6 +26,53 @@ fn data_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(dir)
 }
 
+/// Identifier con el que se guardaron datos en versiones anteriores.
+const LEGACY_IDENTIFIER: &str = "com.notely.app";
+
+/// Migra las notas y ajustes del directorio de datos del identifier antiguo
+/// la primera vez que la app arranca con el actual. Silencioso si no hay
+/// nada que migrar (o si el sandbox impide leer fuera del contenedor).
+pub fn migrate_legacy_data(app: &AppHandle) {
+    let Ok(new_dir) = data_dir(app) else {
+        return;
+    };
+    if new_dir.join("notes").exists() {
+        return;
+    }
+    let Some(parent) = new_dir.parent() else {
+        return;
+    };
+    let old_dir = parent.join(LEGACY_IDENTIFIER);
+    if !old_dir.is_dir() {
+        return;
+    }
+    for name in [
+        "notes",
+        "attachments",
+        "pins.json",
+        "tag_colors.json",
+        "settings.json",
+    ] {
+        let from = old_dir.join(name);
+        if from.exists() {
+            let _ = copy_recursively(&from, &new_dir.join(name));
+        }
+    }
+}
+
+fn copy_recursively(from: &std::path::Path, to: &std::path::Path) -> std::io::Result<()> {
+    if from.is_dir() {
+        fs::create_dir_all(to)?;
+        for entry in fs::read_dir(from)? {
+            let entry = entry?;
+            copy_recursively(&entry.path(), &to.join(entry.file_name()))?;
+        }
+    } else {
+        fs::copy(from, to)?;
+    }
+    Ok(())
+}
+
 /// Directorio donde se guardan las notas como archivos `.md`:
 /// `~/Library/Application Support/com.notely.app/notes` en macOS.
 fn notes_dir(app: &AppHandle) -> Result<PathBuf, String> {
