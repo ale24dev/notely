@@ -6,6 +6,10 @@ dist
 src-tauri/target
 src-tauri/gen/schemas
 
+# Artefactos de firma para App Store (generados por scripts/build-appstore.sh)
+src-tauri/entitlements/appstore.entitlements
+src-tauri/embedded.provisionprofile
+
 # Editor / SO
 .DS_Store
 *.local

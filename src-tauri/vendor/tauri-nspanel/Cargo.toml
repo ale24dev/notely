@@ -1,0 +1,30 @@
+# Copia vendorizada de tauri-nspanel v2.1.0
+# (https://github.com/ahkohd/tauri-nspanel, rev a3122e89, licencia MIT/Apache-2.0).
+#
+# Cambios locales respecto al original:
+# 1. Se elimina la feature `macos-private-api` de la dependencia de tauri:
+#    Notely no usa APIs privadas (requisito de la Mac App Store) y la copia
+#    original la activaba de forma transitiva para toda la app.
+# 2. src/panel.rs: set_corner_radius también activa masksToBounds para que
+#    el recorte redondeado se aplique al webview (subcapa), no solo al fondo.
+
+[package]
+name = "tauri-nspanel"
+version = "2.1.0"
+authors = ["Victor Aremu <me@victorare.mu>"]
+description = "A plugin for subclassing Tauri's NSWindow to NSPanel"
+edition = "2021"
+rust-version = "1.75"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+tauri = "2.8.5"
+pastey = "0.2"
+
+[target."cfg(target_os = \"macos\")".dependencies]
+objc2 = "0.6.1"
+objc2-app-kit = "0.3.1"
+objc2-foundation = "0.3.1"
+
+[features]
+cargo-clippy = []

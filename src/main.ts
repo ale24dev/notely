@@ -10,6 +10,7 @@ import {
   deleteTagColor,
   getTagColors,
   getWidgetEnabled,
+  isSandboxed,
   listNotes,
   loadNote,
   pasteFromClipboard,
@@ -596,6 +597,16 @@ async function quit() {
 
 // ---- Autostart ----
 async function initAutostart() {
+  // En el build de la Mac App Store (App Sandbox) el autostart por
+  // LaunchAgent no está permitido: se oculta la opción.
+  try {
+    if (await isSandboxed()) {
+      autostartToggle.closest("label")?.classList.add("hidden");
+      return;
+    }
+  } catch {
+    // Si no se puede determinar, se muestra la opción normalmente.
+  }
   try {
     autostartToggle.checked = await isEnabled();
   } catch {

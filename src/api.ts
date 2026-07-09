@@ -66,6 +66,10 @@ export function pasteFromClipboard(): Promise<PasteResult> {
   return invoke("paste_from_clipboard");
 }
 
+export function isSandboxed(): Promise<boolean> {
+  return invoke("is_sandboxed");
+}
+
 export function quitApp(): Promise<void> {
   return invoke("quit");
 }

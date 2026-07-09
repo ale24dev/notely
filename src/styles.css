@@ -550,15 +550,16 @@ body {
 }
 
 /* ---- Widget de escritorio ---- */
+/* El webview es opaco (sin APIs privadas): el fondo lo pinta la página y
+   AppKit recorta la ventana con esquinas redondeadas. */
 .widget-body {
-  background: transparent;
+  background: var(--bg);
 }
 
 #widget-root {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
   border: 1px solid var(--border);
   border-radius: 16px;
   overflow: hidden;

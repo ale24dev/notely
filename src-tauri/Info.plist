@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Claves extra que Tauri fusiona en el Info.plist del bundle. -->
+<plist version="1.0">
+<dict>
+    <!-- Sin cifrado propio: evita la pregunta de export compliance en
+         cada subida a App Store Connect. -->
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
+    <!-- App de menu bar: sin icono en el Dock ni menú visible. -->
+    <key>LSUIElement</key>
+    <true/>
+</dict>
+</plist>

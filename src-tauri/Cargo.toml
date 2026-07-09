@@ -8,7 +8,10 @@ edition = "2021"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api"] }
+# Sin la feature macos-private-api: la Mac App Store rechaza apps que usan
+# APIs privadas. La transparencia y las esquinas redondeadas se logran con
+# APIs públicas de AppKit vía tauri-nspanel (vendorizado).
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-positioner = { version = "2", features = ["tray-icon"] }
 tauri-plugin-autostart = "2"
 tauri-plugin-window-state = "2"
@@ -19,7 +22,7 @@ serde_json = "1"
 uuid = { version = "1", features = ["v4"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", rev = "a3122e894383aa068ec5365a42994e3ac94ba1b6" }
+tauri-nspanel = { path = "vendor/tauri-nspanel" }
 
 [profile.release]
 codegen-units = 1

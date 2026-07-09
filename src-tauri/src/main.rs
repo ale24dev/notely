@@ -19,15 +19,23 @@ use tauri_nspanel::{
     tauri_panel, CollectionBehavior, ManagerExt, PanelLevel, StyleMask, WebviewWindowExt,
 };
 
-// En macOS la ventana se convierte en un NSPanel no activante: es la única
-// forma fiable de mostrarla sobre apps a pantalla completa sin activar
-// Notely ni provocar un cambio de Space.
+// En macOS las ventanas se convierten en NSPanel: es la única forma fiable
+// de mostrar el popover sobre apps a pantalla completa sin activar Notely,
+// y permite transparencia y esquinas redondeadas con APIs públicas de
+// AppKit (requisito de la Mac App Store: nada de APIs privadas).
 #[cfg(target_os = "macos")]
 tauri_panel! {
     panel!(NotelyPanel {
         config: {
             can_become_key_window: true,
             is_floating_panel: true
+        }
+    })
+
+    panel!(NotelyWidgetPanel {
+        config: {
+            can_become_key_window: false,
+            is_floating_panel: false
         }
     })
 
@@ -119,6 +127,7 @@ fn main() {
         .manage(LastHide(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
             quit,
+            is_sandboxed,
             open_note,
             notes::list_notes,
             notes::load_note,
@@ -214,6 +223,14 @@ fn quit(app: AppHandle) {
     app.exit(0);
 }
 
+/// ¿Corre la app dentro del App Sandbox (build de Mac App Store)? Algunas
+/// funciones (autostart por LaunchAgent) no están permitidas ahí y la UI
+/// las oculta.
+#[tauri::command]
+fn is_sandboxed() -> bool {
+    std::env::var("APP_SANDBOX_CONTAINER_ID").is_ok()
+}
+
 /// Convierte la ventana principal en un panel del menu bar: no activante
 /// (no roba el foco de la app en uso), visible en cualquier Space incluidos
 /// los de pantalla completa, y flotando al nivel de la barra de estado.
@@ -233,6 +250,10 @@ fn setup_macos_panel(app: &AppHandle) -> tauri::Result<()> {
             .into(),
     );
     panel.set_hides_on_deactivate(false);
+    // Transparencia y esquinas redondeadas con APIs públicas (la ventana ya
+    // no usa transparent+macOSPrivateApi). El radio coincide con el CSS.
+    panel.set_transparent(true);
+    panel.set_corner_radius(12.0);
 
     // Comportamiento de popover: se oculta al dejar de ser ventana clave
     // (clic fuera, cambio de app…).
@@ -253,6 +274,24 @@ fn setup_macos_panel(app: &AppHandle) -> tauri::Result<()> {
         }
     });
     panel.set_event_handler(Some(events.as_ref()));
+
+    // El widget de escritorio también pasa a ser panel: no activante (los
+    // clics en sus checklists no roban el foco de la app en uso), fijo en
+    // todos los Spaces y con las esquinas redondeadas por AppKit.
+    let widget = app
+        .get_webview_window("widget")
+        .expect("la ventana del widget debe existir");
+    let widget_panel = widget.to_panel::<NotelyWidgetPanel>()?;
+    widget_panel.set_style_mask(StyleMask::empty().nonactivating_panel().resizable().into());
+    widget_panel.set_collection_behavior(
+        CollectionBehavior::new()
+            .can_join_all_spaces()
+            .stationary()
+            .into(),
+    );
+    widget_panel.set_hides_on_deactivate(false);
+    widget_panel.set_transparent(true);
+    widget_panel.set_corner_radius(16.0);
 
     Ok(())
 }

@@ -45,6 +45,35 @@ npm run tauri build
 
 Genera `Notely.app` y un `.dmg` en `src-tauri/target/release/bundle/`.
 
+## Publicar en la Mac App Store
+
+La app es compatible con la App Store: no usa APIs privadas (transparencia y
+esquinas redondeadas van por AppKit público vía `tauri-nspanel`, vendorizado
+en `src-tauri/vendor/`), funciona con App Sandbox, y en el build sandboxeado
+la opción "Abrir al iniciar sesión" se oculta sola (los LaunchAgents no están
+permitidos ahí).
+
+Con tu cuenta del Apple Developer Program:
+
+1. Cambia el `identifier` de `src-tauri/tauri.conf.json` por el tuyo y
+   registra ese App ID en el portal de desarrolladores.
+2. Crea la app en App Store Connect, instala los certificados
+   **Apple Distribution** y **3rd Party Mac Developer Installer** en el
+   llavero, y descarga un provisioning profile de tipo *Mac App Store*.
+3. Ejecuta:
+
+```bash
+export APPLE_TEAM_ID="ABCDE12345"
+export APPLE_SIGNING_IDENTITY="Apple Distribution: Tu Nombre (ABCDE12345)"
+export APPLE_INSTALLER_IDENTITY="3rd Party Mac Developer Installer: Tu Nombre (ABCDE12345)"
+export APPLE_PROVISIONING_PROFILE="$HOME/Downloads/Notely_MacAppStore.provisionprofile"
+./scripts/build-appstore.sh
+```
+
+4. Sube el `.pkg` resultante con la app **Transporter** y completa la ficha
+   en App Store Connect (capturas, descripción, privacidad) antes de enviar
+   a revisión.
+
 ## Estructura
 
 ```
