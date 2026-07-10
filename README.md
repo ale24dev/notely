@@ -53,6 +53,11 @@ en `src-tauri/vendor/`), funciona con App Sandbox, y en el build sandboxeado
 la opción "Abrir al iniciar sesión" se oculta sola (los LaunchAgents no están
 permitidos ahí).
 
+> **Nota**: los entitlements incluyen `com.apple.security.network.client`,
+> obligatorio en apps sandboxeadas con WKWebView — sin él el webview no carga
+> y la ventana sale en negro (solo se nota en el build firmado/TestFlight, no
+> en `tauri build --debug`, que no va en sandbox).
+
 Con tu cuenta del Apple Developer Program (Team ID `9FU3PGG489` ya
 configurado como valor por defecto):
 

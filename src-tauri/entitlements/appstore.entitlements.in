@@ -6,6 +6,12 @@
 <dict>
     <key>com.apple.security.app-sandbox</key>
     <true/>
+    <!-- Obligatorio para apps sandboxeadas con WKWebView: sin este
+         entitlement el webview no carga y la ventana sale en negro/blanco.
+         Es la comunicación interna frontend<->backend de Tauri, no acceso a
+         internet (la app no hace peticiones de red externas). -->
+    <key>com.apple.security.network.client</key>
+    <true/>
     <key>com.apple.application-identifier</key>
     <string>__TEAM_ID__.__IDENTIFIER__</string>
     <key>com.apple.developer.team-identifier</key>
