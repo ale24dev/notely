@@ -4,7 +4,7 @@
 # Requisitos (una sola vez):
 #   1. Apple Developer Program activo.
 #   2. En https://developer.apple.com/account/resources/identifiers:
-#      registra el App ID "com.ale24dev.notely" (el identifier de
+#      registra el App ID "com.24notely.app" (el identifier de
 #      src-tauri/tauri.conf.json).
 #   3. Certificados instalados en el llavero (Xcode → Settings → Accounts →
 #      Manage Certificates → +):

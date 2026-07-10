@@ -26,12 +26,14 @@ fn data_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(dir)
 }
 
-/// Identifier con el que se guardaron datos en versiones anteriores.
-const LEGACY_IDENTIFIER: &str = "com.notely.app";
+/// Identifiers con los que se guardaron datos en versiones anteriores,
+/// del más reciente al más antiguo.
+const LEGACY_IDENTIFIERS: [&str; 2] = ["com.ale24dev.notely", "com.notely.app"];
 
-/// Migra las notas y ajustes del directorio de datos del identifier antiguo
-/// la primera vez que la app arranca con el actual. Silencioso si no hay
-/// nada que migrar (o si el sandbox impide leer fuera del contenedor).
+/// Migra las notas y ajustes del directorio de datos de un identifier
+/// antiguo la primera vez que la app arranca con el actual. Silencioso si
+/// no hay nada que migrar (o si el sandbox impide leer fuera del
+/// contenedor).
 pub fn migrate_legacy_data(app: &AppHandle) {
     let Ok(new_dir) = data_dir(app) else {
         return;
@@ -42,10 +44,13 @@ pub fn migrate_legacy_data(app: &AppHandle) {
     let Some(parent) = new_dir.parent() else {
         return;
     };
-    let old_dir = parent.join(LEGACY_IDENTIFIER);
-    if !old_dir.is_dir() {
+    let Some(old_dir) = LEGACY_IDENTIFIERS
+        .iter()
+        .map(|id| parent.join(id))
+        .find(|dir| dir.join("notes").is_dir())
+    else {
         return;
-    }
+    };
     for name in [
         "notes",
         "attachments",

@@ -12,7 +12,7 @@ Gestor de notas en **Markdown** que vive en el **menu bar de macOS**, construido
 - 📌 **Notas fijadas**: ancla las importantes para que queden siempre arriba de la lista.
 - 🖼️ **Widget de escritorio**: activa "Widget en el escritorio" en el pie de la lista y tus notas fijadas aparecen en un panel pegado al escritorio (siempre detrás de las demás ventanas, visible en todos los Spaces). Muestra las checklists interactivas — marca tareas sin abrir la app —, se actualiza en vivo cuando cambian las notas, se puede arrastrar desde su cabecera y recuerda su posición. Clic en el título de una nota para abrirla en el popover. No usa WidgetKit (los widgets nativos de macOS requieren una extensión Swift firmada con Xcode); es una ventana de la propia app que se comporta como un widget.
 - 📋 **Pegar texto e imágenes**: `⌘V` pega texto donde esté el cursor, y si el portapapeles trae una imagen (una captura, algo copiado de una web…) se guarda como PNG en el directorio de adjuntos y se inserta como `![imagen](notely://attachments/…)`; ábrela en la vista previa (`⌘E`) para verla. También se ve en el widget. `⌘C`/`⌘X`/`⌘A` también funcionan en cualquier campo.
-- 💾 **Guardado automático**: las notas se guardan mientras escribes como archivos `.md` en `~/Library/Application Support/com.ale24dev.notely/notes/` — tuyas para siempre, sin formatos propietarios.
+- 💾 **Guardado automático**: las notas se guardan mientras escribes como archivos `.md` en `~/Library/Application Support/com.24notely.app/notes/` — tuyas para siempre, sin formatos propietarios.
 - 🔍 **Búsqueda** instantánea por título, contenido y etiquetas.
 - 🌗 Tema claro/oscuro automático según el sistema.
 
@@ -56,7 +56,7 @@ permitidos ahí).
 Con tu cuenta del Apple Developer Program (Team ID `9FU3PGG489` ya
 configurado como valor por defecto):
 
-1. Registra el App ID `com.ale24dev.notely` en el portal de desarrolladores
+1. Registra el App ID `com.24notely.app` en el portal de desarrolladores
    y crea la app en App Store Connect.
 2. Instala los certificados **Apple Distribution** y **Mac Installer
    Distribution** en el llavero (Xcode → Settings → Accounts → Manage
