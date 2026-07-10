@@ -253,9 +253,11 @@ fn setup_macos_panel(app: &AppHandle) -> tauri::Result<()> {
             .into(),
     );
     panel.set_hides_on_deactivate(false);
-    // Transparencia y esquinas redondeadas con APIs públicas (la ventana ya
-    // no usa transparent+macOSPrivateApi). El radio coincide con el CSS.
-    panel.set_transparent(true);
+    // La ventana se mantiene OPACA a propósito: sin la API privada (que la
+    // App Store rechaza) el webview no puede ser transparente, y un webview
+    // opaco dentro de una ventana transparente se renderiza en negro en
+    // macOS. El fondo lo pinta el CSS; set_corner_radius recorta las esquinas
+    // sobre el fondo de ventana opaco del sistema (radio igual que el CSS).
     panel.set_corner_radius(12.0);
 
     // Comportamiento de popover: se oculta al dejar de ser ventana clave
@@ -293,7 +295,7 @@ fn setup_macos_panel(app: &AppHandle) -> tauri::Result<()> {
             .into(),
     );
     widget_panel.set_hides_on_deactivate(false);
-    widget_panel.set_transparent(true);
+    // Opaco también (ver nota del popover): evita el render en negro.
     widget_panel.set_corner_radius(16.0);
 
     Ok(())
