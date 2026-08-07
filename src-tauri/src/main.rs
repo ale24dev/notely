@@ -321,20 +321,21 @@ fn setup_macos_panel(app: &AppHandle) -> tauri::Result<()> {
 }
 
 /// Calcula dónde debe aparecer el popover: centrado bajo el icono del tray
-/// y con su borde superior por debajo de la franja del menu bar (nunca
-/// superpuesto — ver el comentario de [`TrayRect`]). Si el icono aún no ha
-/// registrado ninguna posición (no debería pasar: se captura justo antes de
-/// llamar aquí), no se mueve la ventana y se deja donde esté.
+/// y pegado al borde inferior de la franja del menu bar (nunca superpuesto
+/// — ver el comentario de [`TrayRect`]), igual que los popovers nativos del
+/// sistema. Si el icono aún no ha registrado ninguna posición (no debería
+/// pasar: se captura justo antes de llamar aquí), no se mueve la ventana y
+/// se deja donde esté.
 fn popover_position(app: &AppHandle, window: &tauri::WebviewWindow) -> Option<PhysicalPosition<i32>> {
-    const GAP_POINTS: f64 = 6.0;
-
     let (tray_pos, tray_size) = (*app.state::<TrayRect>().0.lock().unwrap())?;
     let window_size = window.outer_size().ok()?;
-    let scale = window.scale_factor().unwrap_or(1.0);
-    let gap = GAP_POINTS * scale;
 
+    // El rect del icono es el de la NSWindow del status item, que ya abarca
+    // toda la franja del menu bar (no solo el glifo del icono): su borde
+    // inferior coincide exactamente con el borde inferior del menu bar, así
+    // que sin margen adicional el popover queda pegado a él, sin hueco.
     let mut x = tray_pos.x + tray_size.width / 2.0 - window_size.width as f64 / 2.0;
-    let y = tray_pos.y + tray_size.height + gap;
+    let y = tray_pos.y + tray_size.height;
 
     // No dejar que el popover se salga por el borde derecho de la pantalla
     // (los iconos del tray suelen estar pegados a esa esquina).
