@@ -10,9 +10,8 @@ use std::{
 
 use tauri::{
     tray::{MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Manager,
+    AppHandle, Manager, PhysicalPosition, PhysicalSize,
 };
-use tauri_plugin_positioner::{Position, WindowExt};
 
 #[cfg(target_os = "macos")]
 use tauri_nspanel::{
@@ -48,22 +47,34 @@ tauri_panel! {
 /// Permite distinguir "clic en el icono para cerrar" de "clic para abrir".
 struct LastHide(Mutex<Option<Instant>>);
 
+/// Posición y tamaño del icono del tray, capturados en cada clic. Se usa
+/// para colocar el popover justo debajo del icono — a mano, en lugar de con
+/// tauri-plugin-positioner: su `Position::TrayCenter` en macOS, cuando el
+/// resultado natural da negativo (el caso normal, porque el popover es
+/// mucho más alto que el hueco disponible encima del icono), cae de vuelta
+/// a `y = tray_y`, el borde SUPERIOR del icono — que está dentro de la
+/// franja del menu bar — así que el popover terminaba tapando la barra de
+/// menús en lugar de aparecer debajo.
+struct TrayRect(Mutex<Option<(PhysicalPosition<f64>, PhysicalSize<f64>)>>);
+
 fn main() {
     let builder = tauri::Builder::default()
-        .plugin(tauri_plugin_positioner::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
         .plugin(tauri_plugin_clipboard_manager::init())
-        // Recuerda dónde dejó el usuario el widget de escritorio (el popover
-        // se reposiciona junto al tray en cada apertura, así que no le afecta).
+        // Recuerda dónde dejó el usuario el widget de escritorio. El popover
+        // ("main") queda excluido a propósito: su posición la recalcula
+        // popover_position() en cada apertura a partir del icono del tray,
+        // y no debe restaurarse ni guardarse por su cuenta.
         .plugin(
             tauri_plugin_window_state::Builder::default()
                 .with_state_flags(
                     tauri_plugin_window_state::StateFlags::POSITION
                         | tauri_plugin_window_state::StateFlags::SIZE,
                 )
+                .with_denylist(&["main"])
                 .build(),
         )
         // Protocolo notely:// para servir las imágenes pegadas en las notas
@@ -125,6 +136,7 @@ fn main() {
 
     builder
         .manage(LastHide(Mutex::new(None)))
+        .manage(TrayRect(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
             quit,
             is_sandboxed,
@@ -180,13 +192,20 @@ fn main() {
                 .icon_as_template(true)
                 .tooltip("Notely")
                 .on_tray_icon_event(|tray, event| {
-                    tauri_plugin_positioner::on_tray_event(tray.app_handle(), &event);
                     if let TrayIconEvent::Click {
+                        rect,
                         button_state: MouseButtonState::Down,
                         ..
-                    } = event
+                    } = &event
                     {
-                        toggle_window(tray.app_handle());
+                        let handle = tray.app_handle();
+                        // tray-icon emite el rect en físico: to_physical(1.0)
+                        // solo extrae la variante, no reescala nada.
+                        handle.state::<TrayRect>().0.lock().unwrap().replace((
+                            rect.position.to_physical(1.0),
+                            rect.size.to_physical(1.0),
+                        ));
+                        toggle_window(handle);
                     }
                 })
                 .build(app)?;
@@ -301,6 +320,33 @@ fn setup_macos_panel(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
+/// Calcula dónde debe aparecer el popover: centrado bajo el icono del tray
+/// y con su borde superior por debajo de la franja del menu bar (nunca
+/// superpuesto — ver el comentario de [`TrayRect`]). Si el icono aún no ha
+/// registrado ninguna posición (no debería pasar: se captura justo antes de
+/// llamar aquí), no se mueve la ventana y se deja donde esté.
+fn popover_position(app: &AppHandle, window: &tauri::WebviewWindow) -> Option<PhysicalPosition<i32>> {
+    const GAP_POINTS: f64 = 6.0;
+
+    let (tray_pos, tray_size) = (*app.state::<TrayRect>().0.lock().unwrap())?;
+    let window_size = window.outer_size().ok()?;
+    let scale = window.scale_factor().unwrap_or(1.0);
+    let gap = GAP_POINTS * scale;
+
+    let mut x = tray_pos.x + tray_size.width / 2.0 - window_size.width as f64 / 2.0;
+    let y = tray_pos.y + tray_size.height + gap;
+
+    // No dejar que el popover se salga por el borde derecho de la pantalla
+    // (los iconos del tray suelen estar pegados a esa esquina).
+    if let Ok(Some(monitor)) = window.current_monitor() {
+        let right_edge = (monitor.position().x + monitor.size().width as i32) as f64;
+        let left_edge = monitor.position().x as f64;
+        x = x.min(right_edge - window_size.width as f64).max(left_edge);
+    }
+
+    Some(PhysicalPosition::new(x.round() as i32, y.round() as i32))
+}
+
 /// ¿Se ocultó el popover hace un instante? Si es así, el blur lo provocó el
 /// mismo clic en el icono que estamos procesando: el usuario quería cerrar.
 fn just_hidden(app: &AppHandle) -> bool {
@@ -338,7 +384,9 @@ fn show_popover(app: &AppHandle) {
         return;
     };
     if let Some(window) = app.get_webview_window("main") {
-        let _ = window.move_window(Position::TrayCenter);
+        if let Some(pos) = popover_position(app, &window) {
+            let _ = window.set_position(pos);
+        }
     }
     panel.show_and_make_key();
 }
@@ -366,7 +414,9 @@ fn show_popover(app: &AppHandle) {
     let Some(window) = app.get_webview_window("main") else {
         return;
     };
-    let _ = window.move_window(Position::TrayCenter);
+    if let Some(pos) = popover_position(app, &window) {
+        let _ = window.set_position(pos);
+    }
     let _ = window.show();
     let _ = window.set_focus();
 }

@@ -12,7 +12,6 @@ tauri-build = { version = "2", features = [] }
 # APIs privadas. La transparencia y las esquinas redondeadas se logran con
 # APIs públicas de AppKit vía tauri-nspanel (vendorizado).
 tauri = { version = "2", features = ["tray-icon", "image-png"] }
-tauri-plugin-positioner = { version = "2", features = ["tray-icon"] }
 tauri-plugin-autostart = "2"
 tauri-plugin-window-state = "2"
 tauri-plugin-clipboard-manager = "2"

@@ -1966,7 +1966,6 @@ dependencies = [
  "tauri-nspanel",
  "tauri-plugin-autostart",
  "tauri-plugin-clipboard-manager",
- "tauri-plugin-positioner",
  "tauri-plugin-window-state",
  "uuid",
 ]
@@ -3386,21 +3385,6 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
- "tauri",
- "tauri-plugin",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "tauri-plugin-positioner"
-version = "2.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "686204dc3171a2d59436e470c8ea99f08c5f5bf63ef1a40f900d6d48f433b816"
-dependencies = [
- "log",
- "serde",
- "serde_json",
- "serde_repr",
  "tauri",
  "tauri-plugin",
  "thiserror 2.0.18",
