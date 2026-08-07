@@ -58,6 +58,44 @@ aviso de "app dañada" o "desarrollador no identificado".
 > Mientras `ale24dev/notely` sea privado, la Release con el `.dmg` tiene que
 > vivir en otro repo público (o hacer público este repo antes de publicar).
 
+### Automatizado (recomendado)
+
+`.github/workflows/release-homebrew.yml` hace todo el ciclo en un runner de
+macOS de GitHub Actions: compila, firma, notariza, crea la Release con el
+`.dmg` y actualiza el Cask en `ale24dev/homebrew-notely` — sin tocar tu Mac.
+El flujo de release queda en dos comandos:
+
+```bash
+# 1. Sube la versión en src-tauri/tauri.conf.json, commitea y sube a master
+git add src-tauri/tauri.conf.json
+git commit -m "chore: versión 0.1.7"
+git push
+
+# 2. Etiqueta esa versión — esto dispara todo el pipeline
+git tag v0.1.7
+git push origin v0.1.7
+```
+
+Configuración de una sola vez — 5 *secrets* en **Settings → Secrets and
+variables → Actions → Repository secrets** de este repo:
+
+| Secret | Cómo conseguirlo |
+| --- | --- |
+| `APPLE_CERTIFICATE` | En Acceso a Llaveros, clic derecho sobre tu certificado **"Developer ID Application"** → *Exportar* → formato `.p12`, con una contraseña. Luego: `base64 -i Certificado.p12 \| pbcopy` y pega el resultado. |
+| `APPLE_CERTIFICATE_PASSWORD` | La contraseña que le pusiste al `.p12` al exportarlo (la inventas tú en ese momento). |
+| `APPLE_ID` | Tu Apple ID (el email). |
+| `APPLE_PASSWORD` | Una contraseña específica de app **nueva y dedicada** a este workflow (no reutilices la que usaste en local): [appleid.apple.com/account/manage](https://appleid.apple.com/account/manage) → Inicio de sesión y seguridad → Contraseñas específicas de app. |
+| `HOMEBREW_TAP_TOKEN` | Un GitHub *fine-grained personal access token* ([github.com/settings/personal-access-tokens/new](https://github.com/settings/personal-access-tokens/new)) con acceso **solo** al repo `ale24dev/homebrew-notely` y permiso `Contents: Read and write`. Hace falta porque el token por defecto del workflow no puede escribir en un repo distinto al que lo dispara. |
+
+`APPLE_TEAM_ID` no hace falta como secret: no es información sensible (ya
+está en este mismo README) y va fijo en el workflow.
+
+> El repo es público, así que cualquiera puede ver el workflow — pero los
+> *secrets* nunca se imprimen en los logs y solo se inyectan al hacer push
+> de un tag (no en pull requests de gente externa), así que están a salvo.
+
+### Manual
+
 Con tu cuenta del Apple Developer Program (Team ID `9FU3PGG489` ya
 configurado como valor por defecto):
 
