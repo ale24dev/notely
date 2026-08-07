@@ -272,11 +272,18 @@ fn setup_macos_panel(app: &AppHandle) -> tauri::Result<()> {
             .into(),
     );
     panel.set_hides_on_deactivate(false);
-    // La ventana se mantiene OPACA a propósito: sin la API privada (que la
-    // App Store rechaza) el webview no puede ser transparente, y un webview
-    // opaco dentro de una ventana transparente se renderiza en negro en
-    // macOS. El fondo lo pinta el CSS; set_corner_radius recorta las esquinas
-    // sobre el fondo de ventana opaco del sistema (radio igual que el CSS).
+    // Transparencia de la NSWINDOW (no del webview): setOpaque(false) +
+    // backgroundColor(clear) son API pública de AppKit, nada que ver con la
+    // API privada de macOS que exige la App Store — esa (drawsBackground vía
+    // KVC en el WKWebView) sigue apagada porque no activamos la feature
+    // macos-private-api, así que el propio contenido del webview permanece
+    // opaco pase lo que pase con la ventana. La pantalla en negro de antes
+    // no la causaba esto: era el entitlement network.client que faltaba en
+    // el sandbox (el webview no llegaba a cargar nada). Con transparent, las
+    // esquinas que set_corner_radius recorta del content view dejan ver el
+    // escritorio detrás, en vez de un cuadrado del color de fondo de la
+    // ventana — así se ven realmente redondeadas.
+    panel.set_transparent(true);
     panel.set_corner_radius(12.0);
 
     // Comportamiento de popover: se oculta al dejar de ser ventana clave
@@ -314,7 +321,9 @@ fn setup_macos_panel(app: &AppHandle) -> tauri::Result<()> {
             .into(),
     );
     widget_panel.set_hides_on_deactivate(false);
-    // Opaco también (ver nota del popover): evita el render en negro.
+    // Transparente también (ver nota del popover): esquinas redondeadas de
+    // verdad, sin tocar la API privada.
+    widget_panel.set_transparent(true);
     widget_panel.set_corner_radius(16.0);
 
     Ok(())
