@@ -1,0 +1,38 @@
+# Plantilla de Cask de Homebrew para Notely.
+#
+# No se instala tal cual: scripts/build-homebrew.sh imprime la versión y el
+# sha256 exactos después de compilar; sustitúyelos aquí (__VERSION__ /
+# __SHA256__) y copia el resultado a Casks/notely.rb en tu tap personal
+# (p. ej. github.com/ale24dev/homebrew-notely — ver el README para el porqué
+# de un tap propio en vez del tap oficial homebrew/homebrew-cask).
+#
+# El nombre del asset debe coincidir con el que genera `tauri build`:
+# Notely_<version>_universal.dmg (ver el propio build-homebrew.sh).
+
+cask "notely" do
+  version "__VERSION__"
+  sha256 "__SHA256__"
+
+  url "https://github.com/ale24dev/notely/releases/download/v#{version}/Notely_#{version}_universal.dmg"
+  name "Notely"
+  desc "Gestor de notas en Markdown para el menu bar de macOS"
+  homepage "https://github.com/ale24dev/notely"
+
+  # Coincide con minimumSystemVersion de src-tauri/tauri.conf.json.
+  depends_on macos: ">= :catalina"
+
+  app "Notely.app"
+
+  # Deja que `brew livecheck` detecte versiones nuevas por los tags de
+  # GitHub Releases, para poder automatizar el bump del Cask más adelante.
+  livecheck do
+    url :url
+    strategy :github_latest
+  end
+
+  zap trash: [
+    "~/Library/Application Support/com.24notely.app",
+    "~/Library/Preferences/com.24notely.app.plist",
+    "~/Library/Saved Application State/com.24notely.app.savedState",
+  ]
+end

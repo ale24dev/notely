@@ -45,7 +45,61 @@ npm run tauri build
 
 Genera `Notely.app` y un `.dmg` en `src-tauri/target/release/bundle/`.
 
-## Publicar en la Mac App Store
+## Publicar en Homebrew
+
+Vía de distribución actual (en vez de la Mac App Store / TestFlight): un
+`.dmg` firmado y notarizado por Apple, descargado directamente o instalado
+con `brew install --cask`. Fuera de la Store no hay sandbox ni revisión de
+Apple, pero Gatekeeper exige que el binario esté firmado con un certificado
+**Developer ID** y notarizado — sin eso, macOS se niega a abrirlo con un
+aviso de "app dañada" o "desarrollador no identificado".
+
+> **Repo privado**: Homebrew necesita descargar el `.dmg` sin autenticación.
+> Mientras `ale24dev/notely` sea privado, la Release con el `.dmg` tiene que
+> vivir en otro repo público (o hacer público este repo antes de publicar).
+
+Con tu cuenta del Apple Developer Program (Team ID `9FU3PGG489` ya
+configurado como valor por defecto):
+
+1. Crea un certificado **Developer ID Application** — distinto de los de la
+   App Store — en Xcode → Settings → Accounts → Manage Certificates → ＋.
+2. Genera una contraseña específica de aplicación (no la de tu Apple ID) en
+   [appleid.apple.com/account/manage](https://appleid.apple.com/account/manage)
+   → Inicio de sesión y seguridad → Contraseñas específicas de app.
+3. Ejecuta:
+
+```bash
+export APPLE_ID="tu-apple-id@icloud.com"
+export APPLE_PASSWORD="xxxx-xxxx-xxxx-xxxx"
+./scripts/build-homebrew.sh
+```
+
+El script detecta el certificado en el llavero, compila el binario
+universal, y dado que trae las credenciales de Apple en el entorno, `tauri
+build` firma, notariza y adjunta el ticket de notarización (staple) de
+forma automática — sin pasos manuales como en el flujo de App Store. Al
+final verifica con `stapler` y `spctl` que todo quedó en regla, y muestra
+el sha256 del `.dmg` para el Cask.
+
+4. Crea una GitHub Release (tag `v<versión>`) con el `.dmg` como asset.
+5. Rellena `homebrew/notely.rb.in` con la versión y el sha256 que imprimió
+   el script, y publícalo como `Casks/notely.rb` en un **tap personal**
+   (p. ej. `github.com/ale24dev/homebrew-notely` — un repo nuevo con ese
+   único archivo). El tap oficial `homebrew/homebrew-cask` exige criterios
+   de notoriedad (estrellas, uso) que una app nueva normalmente no cumple
+   todavía; un tap propio no necesita aprobación de nadie.
+6. Instalación para cualquiera:
+
+```bash
+brew tap ale24dev/notely
+brew install --cask notely
+```
+
+## Publicar en la Mac App Store (en pausa)
+
+Se dejó todo el andamiaje montado por si se retoma más adelante, pero no es
+la vía activa ahora mismo — no hace falta tocar nada de esta sección para
+distribuir por Homebrew.
 
 La app es compatible con la App Store: no usa APIs privadas (transparencia y
 esquinas redondeadas van por AppKit público vía `tauri-nspanel`, vendorizado
