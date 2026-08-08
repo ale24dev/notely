@@ -25,4 +25,9 @@ export const icons = {
     '<path class="pin-body" d="M10 3h4a1 1 0 0 1 1 1v4.5l1.8 2.2a1 1 0 0 1-.78 1.63H8a1 1 0 0 1-.78-1.63L9 8.5V4a1 1 0 0 1 1-1z"/>' +
       '<path d="M12 12.5v8"/>',
   ),
+  settings: icon(
+    '<path d="M4 7h9M17 7h3"/><circle cx="15" cy="7" r="1.8"/>' +
+      '<path d="M4 12h3M11 12h9"/><circle cx="9" cy="12" r="1.8"/>' +
+      '<path d="M4 17h7M17 17h3"/><circle cx="13" cy="17" r="1.8"/>',
+  ),
 };

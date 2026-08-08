@@ -141,6 +141,7 @@ fn main() {
             quit,
             is_sandboxed,
             open_note,
+            open_settings,
             notes::list_notes,
             notes::load_note,
             notes::save_note,
@@ -152,6 +153,8 @@ fn main() {
             notes::delete_tag_color,
             notes::get_widget_enabled,
             notes::set_widget_enabled,
+            notes::get_theme,
+            notes::set_theme,
             notes::paste_from_clipboard
         ])
         .setup(|app| {
@@ -238,6 +241,22 @@ fn open_note(app: AppHandle, id: String) {
     use tauri::Emitter;
     let _ = app.emit_to("main", "open-note", id);
     show_popover(&app);
+}
+
+/// Abre la ventana de Ajustes: a diferencia del popover y el widget, es una
+/// ventana normal (con barra de título, cierra con el botón rojo, admite
+/// escribir/hacer clic con normalidad) — como las Preferencias de cualquier
+/// app de macOS. No hace falta pasar a política de activación "Regular"
+/// para eso: una app Accessory ya puede enfocar e interactuar con sus
+/// propias ventanas con normalidad, solo se queda sin icono en el Dock.
+#[tauri::command]
+fn open_settings(app: AppHandle) {
+    let Some(window) = app.get_webview_window("settings") else {
+        return;
+    };
+    let _ = window.center();
+    let _ = window.show();
+    let _ = window.set_focus();
 }
 
 #[tauri::command]

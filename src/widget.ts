@@ -10,6 +10,7 @@ import {
 import { colorForTag } from "./colors";
 import { renderMarkdown, toggleTaskInContent } from "./markdown";
 import { joinBody, splitBody } from "./noteContent";
+import { initTheme } from "./theme";
 
 const notesContainer = document.querySelector<HTMLElement>("#widget-notes")!;
 const emptyState = document.querySelector<HTMLElement>("#widget-empty")!;
@@ -109,4 +110,5 @@ void listen("notes-changed", () => {
 // Refresco periódico para fechas y cambios externos en disco.
 setInterval(() => void refresh(), 5 * 60 * 1000);
 
+void initTheme();
 void refresh();

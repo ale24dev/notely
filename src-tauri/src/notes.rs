@@ -172,10 +172,25 @@ pub fn paste_from_clipboard(app: AppHandle) -> Result<PasteResult, String> {
 
 // ---- Ajustes ----
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize)]
 pub struct Settings {
     #[serde(default)]
     pub widget_enabled: bool,
+    #[serde(default = "default_theme")]
+    pub theme: String,
+}
+
+fn default_theme() -> String {
+    "system".to_string()
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            widget_enabled: false,
+            theme: default_theme(),
+        }
+    }
 }
 
 fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -206,6 +221,25 @@ pub fn set_widget_enabled(app: AppHandle, enabled: bool) -> Result<(), String> {
     settings.widget_enabled = enabled;
     save_settings(&app, &settings)?;
     crate::apply_widget_visibility(&app, enabled);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_theme(app: AppHandle) -> Result<String, String> {
+    Ok(load_settings(&app).theme)
+}
+
+#[tauri::command]
+pub fn set_theme(app: AppHandle, theme: String) -> Result<(), String> {
+    if !matches!(theme.as_str(), "light" | "dark" | "system") {
+        return Err(format!("tema no válido: {theme}"));
+    }
+    let mut settings = load_settings(&app);
+    settings.theme = theme.clone();
+    save_settings(&app, &settings)?;
+    // Notifica a todas las ventanas abiertas (popover, widget, ajustes)
+    // para que apliquen el cambio sin esperar a reabrirse.
+    let _ = app.emit("theme-changed", theme);
     Ok(())
 }
 

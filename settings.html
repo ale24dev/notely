@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ajustes de Notely</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body class="settings-body">
+    <div id="settings-root">
+      <section class="settings-section">
+        <h2 class="settings-heading">Apariencia</h2>
+        <div id="theme-switch" class="theme-switch" role="radiogroup" aria-label="Tema">
+          <button type="button" class="theme-option" data-theme="light">Claro</button>
+          <button type="button" class="theme-option" data-theme="dark">Oscuro</button>
+          <button type="button" class="theme-option" data-theme="system">Sistema</button>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h2 class="settings-heading">General</h2>
+        <label
+          class="settings-toggle"
+          title="Lanzar Notely automáticamente al iniciar sesión"
+        >
+          <input type="checkbox" id="autostart-toggle" />
+          Abrir al iniciar sesión
+        </label>
+        <label
+          class="settings-toggle"
+          title="Mostrar las notas fijadas en un widget sobre el escritorio"
+        >
+          <input type="checkbox" id="widget-toggle" />
+          Widget en el escritorio
+        </label>
+      </section>
+    </div>
+    <script type="module" src="/src/settings.ts"></script>
+  </body>
+</html>

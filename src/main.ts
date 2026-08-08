@@ -1,6 +1,5 @@
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { PALETTE, colorForTag as colorFor, textOn } from "./colors";
 import { renderMarkdown, toggleTaskInContent } from "./markdown";
@@ -10,19 +9,18 @@ import {
   deleteNote,
   deleteTagColor,
   getTagColors,
-  getWidgetEnabled,
-  isSandboxed,
   listNotes,
   loadNote,
+  openSettings,
   pasteFromClipboard,
   quitApp,
   saveNote,
   setTagColor,
-  setWidgetEnabled,
   togglePin,
   type NoteMeta,
 } from "./api";
 import { icons } from "./icons";
+import { initTheme } from "./theme";
 
 // ---- Elementos del DOM ----
 const listView = document.querySelector<HTMLElement>("#list-view")!;
@@ -31,6 +29,7 @@ const notesList = document.querySelector<HTMLUListElement>("#notes-list")!;
 const emptyState = document.querySelector<HTMLElement>("#empty-state")!;
 const searchInput = document.querySelector<HTMLInputElement>("#search-input")!;
 const tagsBar = document.querySelector<HTMLElement>("#tags-bar")!;
+const settingsBtn = document.querySelector<HTMLButtonElement>("#settings-btn")!;
 const newNoteBtn = document.querySelector<HTMLButtonElement>("#new-note-btn")!;
 const quitBtn = document.querySelector<HTMLButtonElement>("#quit-btn")!;
 const backBtn = document.querySelector<HTMLButtonElement>("#back-btn")!;
@@ -40,13 +39,12 @@ const previewBtn = document.querySelector<HTMLButtonElement>("#toggle-preview-bt
 const editor = document.querySelector<HTMLTextAreaElement>("#note-editor")!;
 const preview = document.querySelector<HTMLElement>("#note-preview")!;
 const saveStatus = document.querySelector<HTMLElement>("#save-status")!;
-const autostartToggle = document.querySelector<HTMLInputElement>("#autostart-toggle")!;
-const widgetToggle = document.querySelector<HTMLInputElement>("#widget-toggle")!;
 const editorTagPills = document.querySelector<HTMLElement>("#editor-tag-pills")!;
 const tagInput = document.querySelector<HTMLInputElement>("#tag-input")!;
 const tagSuggestions = document.querySelector<HTMLElement>("#tag-suggestions")!;
 
 // Iconos estilo Cupertino (SVG estáticos propios, no contenido de usuario).
+settingsBtn.innerHTML = icons.settings;
 newNoteBtn.innerHTML = icons.plus;
 quitBtn.innerHTML = icons.power;
 backBtn.innerHTML = icons.chevronLeft;
@@ -612,53 +610,8 @@ async function quit() {
   await quitApp();
 }
 
-// ---- Autostart ----
-async function initAutostart() {
-  // En el build de la Mac App Store (App Sandbox) el autostart por
-  // LaunchAgent no está permitido: se oculta la opción.
-  try {
-    if (await isSandboxed()) {
-      autostartToggle.closest("label")?.classList.add("hidden");
-      return;
-    }
-  } catch {
-    // Si no se puede determinar, se muestra la opción normalmente.
-  }
-  try {
-    autostartToggle.checked = await isEnabled();
-  } catch {
-    // El plugin puede no estar disponible (p. ej. permisos); se deja apagado.
-  }
-  autostartToggle.addEventListener("change", async () => {
-    try {
-      if (autostartToggle.checked) {
-        await enable();
-      } else {
-        await disable();
-      }
-    } catch {
-      autostartToggle.checked = !autostartToggle.checked;
-    }
-  });
-}
-
-// ---- Widget de escritorio ----
-async function initWidgetToggle() {
-  try {
-    widgetToggle.checked = await getWidgetEnabled();
-  } catch {
-    // Sin ajuste guardado; se deja apagado.
-  }
-  widgetToggle.addEventListener("change", async () => {
-    try {
-      await setWidgetEnabled(widgetToggle.checked);
-    } catch {
-      widgetToggle.checked = !widgetToggle.checked;
-    }
-  });
-}
-
 // ---- Eventos ----
+settingsBtn.addEventListener("click", () => void openSettings());
 newNoteBtn.addEventListener("click", newNote);
 quitBtn.addEventListener("click", quit);
 backBtn.addEventListener("click", closeEditor);
@@ -787,6 +740,9 @@ document.addEventListener("keydown", (e) => {
   if (cmd && e.key === "q") {
     e.preventDefault();
     void quit();
+  } else if (cmd && e.key === ",") {
+    e.preventDefault();
+    void openSettings();
   } else if (cmd && e.key === "n") {
     e.preventDefault();
     void newNote();
@@ -839,6 +795,7 @@ editor.addEventListener("keydown", (e) => {
 });
 
 async function init() {
+  await initTheme();
   try {
     tagColors = await getTagColors();
   } catch {
@@ -848,5 +805,3 @@ async function init() {
 }
 
 void init();
-void initAutostart();
-void initWidgetToggle();

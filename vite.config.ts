@@ -30,6 +30,7 @@ export default defineConfig({
       input: {
         main: "index.html",
         widget: "widget.html",
+        settings: "settings.html",
       },
     },
   },

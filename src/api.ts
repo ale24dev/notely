@@ -53,8 +53,22 @@ export function setWidgetEnabled(enabled: boolean): Promise<void> {
   return invoke("set_widget_enabled", { enabled });
 }
 
+export type Theme = "light" | "dark" | "system";
+
+export function getTheme(): Promise<Theme> {
+  return invoke("get_theme");
+}
+
+export function setTheme(theme: Theme): Promise<void> {
+  return invoke("set_theme", { theme });
+}
+
 export function openNoteInPopover(id: string): Promise<void> {
   return invoke("open_note", { id });
+}
+
+export function openSettings(): Promise<void> {
+  return invoke("open_settings");
 }
 
 export type PasteResult =
