@@ -4,6 +4,7 @@ import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { PALETTE, colorForTag as colorFor, textOn } from "./colors";
 import { renderMarkdown, toggleTaskInContent } from "./markdown";
+import { extractTags, joinBody, normalizeTag, removeTagFromText, splitBody } from "./noteContent";
 import {
   createNote,
   deleteNote,
@@ -43,7 +44,7 @@ const autostartToggle = document.querySelector<HTMLInputElement>("#autostart-tog
 const widgetToggle = document.querySelector<HTMLInputElement>("#widget-toggle")!;
 const editorTagPills = document.querySelector<HTMLElement>("#editor-tag-pills")!;
 const tagInput = document.querySelector<HTMLInputElement>("#tag-input")!;
-const tagsDatalist = document.querySelector<HTMLDataListElement>("#tags-datalist")!;
+const tagSuggestions = document.querySelector<HTMLElement>("#tag-suggestions")!;
 
 // Iconos estilo Cupertino (SVG estáticos propios, no contenido de usuario).
 newNoteBtn.innerHTML = icons.plus;
@@ -61,6 +62,10 @@ let activeTag: string | null = null;
 let tagColors: Record<string, string> = {};
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let dirty = false;
+/// Etiquetas gestionadas desde el pie de la nota abierta (separadas del
+/// cuerpo editable; ver src/noteContent.ts). Las que el usuario escribe a
+/// mano dentro del texto siguen detectándose con extractTags aparte.
+let footerTags: string[] = [];
 
 // ---- Colores de etiquetas ----
 
@@ -68,36 +73,6 @@ let dirty = false;
 /// explícitamente (registradas en tagColors aunque aún no se usen).
 function allTags(): string[] {
   return [...new Set([...notes.flatMap((n) => n.tags), ...Object.keys(tagColors)])].sort();
-}
-
-/// Normaliza el nombre de una etiqueta: sin '#', en minúsculas y solo
-/// letras, números, guiones y guiones bajos (igual que el backend).
-function normalizeTag(raw: string): string | null {
-  const tag = raw.trim().replace(/^#+/, "").replace(/\s+/g, "-").toLowerCase();
-  return /^[\p{L}\p{N}_-]+$/u.test(tag) ? tag : null;
-}
-
-/// Réplica en el cliente de extract_tags de Rust, para refrescar las
-/// etiquetas del editor mientras se escribe sin ir al backend.
-function extractTags(content: string): string[] {
-  const tags: string[] = [];
-  let inFence = false;
-  for (const line of content.split("\n")) {
-    const trimmed = line.trimStart();
-    if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
-      inFence = !inFence;
-      continue;
-    }
-    if (inFence) continue;
-    for (const token of line.split(/\s+/)) {
-      if (!token.startsWith("#") || token.startsWith("##")) continue;
-      const match = token.slice(1).match(/^[\p{L}\p{N}_-]+/u);
-      if (!match) continue;
-      const tag = match[0].toLowerCase();
-      if (!tags.includes(tag)) tags.push(tag);
-    }
-  }
-  return tags.sort();
 }
 
 function colorForTag(tag: string): string {
@@ -157,6 +132,7 @@ function closeColorPicker() {
 
 document.addEventListener("click", (e) => {
   if (!colorPicker.contains(e.target as Node)) closeColorPicker();
+  if (!tagSuggestions.contains(e.target as Node) && e.target !== tagInput) closeTagSuggestions();
 });
 
 // ---- Lista de notas ----
@@ -337,8 +313,14 @@ function formatDate(epochMs: number): string {
 }
 
 // ---- Etiquetas de la nota abierta ----
+/// Todas las etiquetas de la nota abierta: las del pie más las que el
+/// usuario haya escrito a mano dentro del texto.
+function currentNoteTags(): string[] {
+  return [...new Set([...extractTags(editor.value), ...footerTags])].sort();
+}
+
 function renderEditorTags() {
-  const tags = extractTags(editor.value);
+  const tags = currentNoteTags();
   editorTagPills.innerHTML = "";
   for (const tag of tags) {
     const color = colorForTag(tag);
@@ -357,77 +339,83 @@ function renderEditorTags() {
 
     editorTagPills.appendChild(pill);
   }
-
-  tagsDatalist.innerHTML = "";
-  for (const tag of allTags()) {
-    if (tags.includes(tag)) continue;
-    const option = document.createElement("option");
-    option.value = tag;
-    tagsDatalist.appendChild(option);
-  }
 }
 
-/// Añade `#tag` al final de la nota (reutilizando la última línea si ya
-/// es una línea de etiquetas).
+/// Añade una etiqueta al pie de la nota (no toca el cuerpo/textarea).
 function addTagToNote(tag: string) {
-  if (extractTags(editor.value).includes(tag)) return;
-  if (editor.value.trim() === "") {
-    editor.value = `#${tag}`;
-  } else {
-    const lines = editor.value.replace(/\s+$/, "").split("\n");
-    const last = lines[lines.length - 1].trim();
-    const isTagLine = last.length > 0 && last.split(/\s+/).every((t) => t.startsWith("#") && !t.startsWith("##"));
-    if (isTagLine) {
-      lines[lines.length - 1] += ` #${tag}`;
-    } else {
-      lines.push("", `#${tag}`);
-    }
-    editor.value = lines.join("\n");
-  }
-  recordChange(true);
+  if (currentNoteTags().includes(tag)) return;
+  footerTags.push(tag);
   scheduleSave();
   renderEditorTags();
+  if (previewMode) renderPreviewFooter();
 }
 
-/// Elimina todas las apariciones de `#tag` del texto (fuera de bloques de
-/// código), limpiando las líneas que queden vacías.
+/// Quita una etiqueta: del pie si estaba ahí, y de cualquier mención suelta
+/// dentro del cuerpo si el usuario la había escrito a mano.
 function removeTagFromNote(tag: string) {
-  const lines = editor.value.split("\n");
-  let inFence = false;
-  const result: string[] = [];
-  for (const line of lines) {
-    const trimmed = line.trimStart();
-    if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
-      inFence = !inFence;
-      result.push(line);
-      continue;
-    }
-    if (inFence) {
-      result.push(line);
-      continue;
-    }
-    const hadTag = line.split(/\s+/).some((t) => isTagToken(t, tag));
-    if (!hadTag) {
-      result.push(line);
-      continue;
-    }
-    const cleaned = line
-      .split(/\s+/)
-      .filter((t) => !isTagToken(t, tag))
-      .join(" ")
-      .trimEnd();
-    if (cleaned.trim() !== "") result.push(cleaned);
+  if (footerTags.includes(tag)) {
+    footerTags = footerTags.filter((t) => t !== tag);
   }
-  editor.value = result.join("\n").replace(/\n+$/, "\n").replace(/^\n+/, "");
-  recordChange(true);
+  if (extractTags(editor.value).includes(tag)) {
+    editor.value = removeTagFromText(editor.value, tag);
+    recordChange(true);
+  }
   scheduleSave();
   renderEditorTags();
+  if (previewMode) renderPreviewFooter();
 }
 
-function isTagToken(token: string, tag: string): boolean {
-  if (!token.startsWith("#") || token.startsWith("##")) return false;
-  const match = token.slice(1).match(/^[\p{L}\p{N}_-]+/u);
-  return match !== null && match[0].toLowerCase() === tag;
+// ---- Dropdown de sugerencias del campo "+ etiqueta" ----
+// Un <datalist> nativo no se puede colorear (lo pinta el sistema, no el
+// webview); este desplegable es propio para poder mostrar el punto de
+// color de cada etiqueta, igual que en los chips de filtro y las píldoras.
+let tagSuggestionsList: string[] = [];
+let tagSuggestionIndex = -1;
+
+function updateTagSuggestions() {
+  const query = tagInput.value.trim().replace(/^#/, "").toLowerCase();
+  const existing = new Set(currentNoteTags());
+  tagSuggestionsList = allTags()
+    .filter((t) => !existing.has(t))
+    .filter((t) => query === "" || t.includes(query))
+    .slice(0, 8);
+  tagSuggestionIndex = -1;
+  renderTagSuggestions();
+}
+
+function renderTagSuggestions() {
+  tagSuggestions.innerHTML = "";
+  if (tagSuggestionsList.length === 0) {
+    tagSuggestions.classList.add("hidden");
+    return;
+  }
+  tagSuggestionsList.forEach((tag, i) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "tag-suggestion" + (i === tagSuggestionIndex ? " active" : "");
+
+    const dot = document.createElement("span");
+    dot.className = "tag-suggestion-dot";
+    dot.style.background = colorForTag(tag);
+
+    item.append(dot, document.createTextNode(`#${tag}`));
+    // mousedown (no click) para leer la selección antes de que el input
+    // pierda el foco y se cierre el desplegable.
+    item.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      addTagToNote(tag);
+      tagInput.value = "";
+      closeTagSuggestions();
+    });
+    tagSuggestions.appendChild(item);
+  });
+  tagSuggestions.classList.remove("hidden");
+}
+
+function closeTagSuggestions() {
+  tagSuggestions.classList.add("hidden");
+  tagSuggestionsList = [];
+  tagSuggestionIndex = -1;
 }
 
 // ---- Historial de deshacer/rehacer del editor ----
@@ -498,7 +486,9 @@ function firstDiffIndex(a: string, b: string): number {
 async function openNote(id: string) {
   currentId = id;
   currentPinned = notes.find((n) => n.id === id)?.pinned ?? false;
-  editor.value = await loadNote(id);
+  const split = splitBody(await loadNote(id));
+  editor.value = split.body;
+  footerTags = split.footerTags;
   resetHistory();
   dirty = false;
   saveStatus.textContent = "";
@@ -529,13 +519,40 @@ async function flushSave() {
   clearTimeout(saveTimer);
   if (!dirty || currentId === null) return;
   dirty = false;
-  await saveNote(currentId, editor.value);
+  await saveNote(currentId, joinBody(editor.value, footerTags));
   saveStatus.textContent = "Guardado";
 }
 
 // ---- Vista previa: Markdown + checklists interactivas + resaltado ----
 function renderPreview() {
   renderMarkdown(preview, editor.value, toggleTask);
+  renderPreviewFooter();
+}
+
+/// Pie de etiquetas de la vista previa: chips de color, no el texto crudo
+/// "#tag1 #tag2" como un párrafo más del Markdown renderizado.
+function renderPreviewFooter() {
+  let footer = preview.querySelector<HTMLElement>(".preview-tags-footer");
+  const tags = currentNoteTags();
+  if (tags.length === 0) {
+    footer?.remove();
+    return;
+  }
+  if (!footer) {
+    footer = document.createElement("div");
+    footer.className = "preview-tags-footer";
+    preview.appendChild(footer);
+  }
+  footer.innerHTML = "";
+  for (const tag of tags) {
+    const color = colorForTag(tag);
+    const pill = document.createElement("span");
+    pill.className = "note-tag";
+    pill.textContent = `#${tag}`;
+    pill.style.background = `color-mix(in srgb, ${color} 18%, transparent)`;
+    pill.style.color = `color-mix(in srgb, ${color} 65%, var(--text))`;
+    footer.appendChild(pill);
+  }
 }
 
 function toggleTask(index: number) {
@@ -655,23 +672,39 @@ editor.addEventListener("input", () => {
 });
 searchInput.addEventListener("input", renderList);
 
-// Añadir etiqueta a la nota abierta desde el campo del editor.
+// Añadir etiqueta a la nota abierta desde el campo del editor, con
+// desplegable propio (con colores) en vez del datalist nativo del sistema.
+tagInput.addEventListener("input", updateTagSuggestions);
+tagInput.addEventListener("focus", updateTagSuggestions);
+tagInput.addEventListener("blur", () => {
+  // Retraso corto: si el blur lo provocó un clic en una sugerencia, su
+  // propio mousedown (que se dispara antes) ya la habrá seleccionado.
+  setTimeout(closeTagSuggestions, 100);
+});
 tagInput.addEventListener("keydown", (e) => {
   e.stopPropagation();
-  if (e.key === "Enter") {
-    const tag = normalizeTag(tagInput.value);
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    if (tagSuggestionsList.length === 0) return;
+    e.preventDefault();
+    const delta = e.key === "ArrowDown" ? 1 : -1;
+    tagSuggestionIndex =
+      (tagSuggestionIndex + delta + tagSuggestionsList.length) % tagSuggestionsList.length;
+    renderTagSuggestions();
+  } else if (e.key === "Enter") {
+    e.preventDefault();
+    const tag =
+      tagSuggestionIndex >= 0 ? tagSuggestionsList[tagSuggestionIndex] : normalizeTag(tagInput.value);
     if (tag !== null) addTagToNote(tag);
     tagInput.value = "";
+    closeTagSuggestions();
   } else if (e.key === "Escape") {
-    tagInput.value = "";
-    tagInput.blur();
+    if (tagSuggestionsList.length > 0) {
+      closeTagSuggestions();
+    } else {
+      tagInput.value = "";
+      tagInput.blur();
+    }
   }
-});
-// El autocompletado del datalist dispara "change" al elegir una opción.
-tagInput.addEventListener("change", () => {
-  const tag = normalizeTag(tagInput.value);
-  if (tag !== null) addTagToNote(tag);
-  tagInput.value = "";
 });
 
 // ---- Portapapeles ----

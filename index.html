@@ -75,24 +75,25 @@
             ></button>
           </div>
         </header>
-        <div class="editor-tags">
-          <div id="editor-tag-pills" class="editor-tag-pills"></div>
-          <input
-            id="tag-input"
-            type="text"
-            placeholder="+ etiqueta"
-            list="tags-datalist"
-            autocomplete="off"
-            spellcheck="false"
-          />
-          <datalist id="tags-datalist"></datalist>
-        </div>
         <textarea
           id="note-editor"
           placeholder="# Escribe tu nota en Markdown…"
           spellcheck="false"
         ></textarea>
         <article id="note-preview" class="markdown-body hidden"></article>
+        <footer id="editor-tags-footer" class="editor-tags-footer">
+          <div id="editor-tag-pills" class="editor-tag-pills"></div>
+          <div class="tag-input-wrap">
+            <input
+              id="tag-input"
+              type="text"
+              placeholder="+ etiqueta"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <div id="tag-suggestions" class="tag-suggestions hidden"></div>
+          </div>
+        </footer>
         <footer class="statusbar">
           <span id="save-status"></span>
         </footer>

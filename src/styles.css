@@ -355,13 +355,17 @@ body {
   line-height: 1.6;
 }
 
-/* ---- Etiquetas del editor ---- */
-.editor-tags {
+/* ---- Pie de etiquetas del editor ----
+   Separado del cuerpo a propósito: al añadir una etiqueta no se mezcla
+   como texto dentro de lo que se está escribiendo. */
+.editor-tags-footer {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 4px;
-  padding: 0 14px 6px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 .editor-tag-pills {
@@ -389,18 +393,71 @@ body {
   opacity: 1;
 }
 
+.tag-input-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 90px;
+}
+
 #tag-input {
+  width: 100%;
   border: none;
   background: transparent;
   color: var(--text);
   font-size: 11px;
   outline: none;
-  min-width: 90px;
   padding: 2px 0;
 }
 
 #tag-input::placeholder {
   color: var(--text-muted);
+}
+
+/* Desplegable propio de sugerencias: se abre hacia ARRIBA porque el pie
+   vive cerca del borde inferior del popover y no cabría hacia abajo. */
+.tag-suggestions {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 6px;
+  min-width: 140px;
+  max-width: 220px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  z-index: 20;
+}
+
+.tag-suggestions.hidden {
+  display: none;
+}
+
+.tag-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  padding: 6px 10px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.tag-suggestion:hover,
+.tag-suggestion.active {
+  background: var(--border);
+}
+
+.tag-suggestion-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 /* ---- Editor ---- */
@@ -529,6 +586,17 @@ body {
   border: none;
   border-top: 1px solid var(--border);
   margin: 0.8em 0;
+}
+
+/* Pie de etiquetas de la vista previa: chips de color, no el texto crudo
+   "#tag1 #tag2" renderizado como un párrafo más. */
+.preview-tags-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 0.8em;
+  padding-top: 0.6em;
+  border-top: 1px solid var(--border);
 }
 
 /* ---- Barra de estado ---- */

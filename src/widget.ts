@@ -9,6 +9,7 @@ import {
 } from "./api";
 import { colorForTag } from "./colors";
 import { renderMarkdown, toggleTaskInContent } from "./markdown";
+import { joinBody, splitBody } from "./noteContent";
 
 const notesContainer = document.querySelector<HTMLElement>("#widget-notes")!;
 const emptyState = document.querySelector<HTMLElement>("#widget-empty")!;
@@ -73,23 +74,27 @@ function buildCard(note: NoteMeta): HTMLElement {
 }
 
 function renderBody(body: HTMLElement, id: string) {
-  // El título ya se muestra en la cabecera de la tarjeta: se omite la
-  // primera línea si es un encabezado con el mismo texto.
+  // El título ya se muestra en la cabecera de la tarjeta (se omite la
+  // primera línea si es un encabezado), y las etiquetas del pie ya se
+  // muestran como píldoras de color ahí mismo: no hace falta repetirlas
+  // como texto crudo "#tag1 #tag2" dentro del Markdown renderizado.
   const content = contents.get(id) ?? "";
-  const withoutTitle = content.replace(/^#{1,6}\s+.*\n?/, "");
+  const { body: withoutFooter } = splitBody(content);
+  const withoutTitle = withoutFooter.replace(/^#{1,6}\s+.*\n?/, "");
   renderMarkdown(body, withoutTitle, (index) => void toggleTask(id, body, index));
 }
 
-async function toggleTask(id: string, body: HTMLElement, index: number) {
+async function toggleTask(id: string, cardBody: HTMLElement, index: number) {
   const content = contents.get(id);
   if (content === undefined) return;
-  const withoutTitle = content.replace(/^#{1,6}\s+.*\n?/, "");
-  const updatedBody = toggleTaskInContent(withoutTitle, index);
-  if (updatedBody === null) return;
-  const title = content.slice(0, content.length - withoutTitle.length);
-  const updated = title + updatedBody;
+  const { body: withoutFooter, footerTags } = splitBody(content);
+  const withoutTitle = withoutFooter.replace(/^#{1,6}\s+.*\n?/, "");
+  const updatedWithoutTitle = toggleTaskInContent(withoutTitle, index);
+  if (updatedWithoutTitle === null) return;
+  const title = withoutFooter.slice(0, withoutFooter.length - withoutTitle.length);
+  const updated = joinBody(title + updatedWithoutTitle, footerTags);
   contents.set(id, updated);
-  renderBody(body, id);
+  renderBody(cardBody, id);
   await saveNote(id, updated);
 }
 
