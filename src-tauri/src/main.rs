@@ -218,6 +218,21 @@ fn main() {
                 apply_widget_visibility(app.handle(), true);
             }
 
+            // La ventana de Ajustes se oculta al cerrarla en vez de
+            // destruirse: por defecto el botón rojo la destruye, y como no
+            // se recrea sola, un segundo open_settings ya no encontraría
+            // nada que mostrar.
+            let settings_window = app
+                .get_webview_window("settings")
+                .expect("la ventana de ajustes debe existir");
+            let settings_handle = settings_window.clone();
+            settings_window.on_window_event(move |event| {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    let _ = settings_handle.hide();
+                }
+            });
+
             Ok(())
         })
         .run(tauri::generate_context!())
